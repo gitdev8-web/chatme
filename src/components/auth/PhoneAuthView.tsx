@@ -58,9 +58,9 @@ const POPULAR_COUNTRIES: Country[] = [
 ];
 
 const FIREBASE_CONSOLE_URL =
-  'https://console.firebase.google.com/project/gen-lang-client-0530556818/authentication/providers';
+  'https://console.firebase.google.com/project/chatme-fb268/authentication/providers';
 const FIREBASE_SETTINGS_URL =
-  'https://console.firebase.google.com/project/gen-lang-client-0530556818/authentication/settings';
+  'https://console.firebase.google.com/project/chatme-fb268/authentication/settings';
 
 export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail }) => {
   const {

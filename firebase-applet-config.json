@@ -1,12 +1,10 @@
 {
-  "projectId": "gen-lang-client-0530556818",
-  "appId": "1:449107786271:web:b56471e1362404a803f32a",
-  "apiKey": "AIzaSyDO-KVb5H7GGEGizxpOaS4Oggqmt-C_LCg",
-  "authDomain": "gen-lang-client-0530556818.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-0e82e81b-7529-46aa-9855-34897ca64c7e",
-  "storageBucket": "gen-lang-client-0530556818.firebasestorage.app",
-  "messagingSenderId": "449107786271",
-  "measurementId": "",
-  "oAuthClientId": "449107786271-775l8ldfhjjh8ggdlhpiivmog7mfb16u.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "chatme-fb268",
+  "appId": "1:919231382236:web:cfaa34092a8403de3c6a19",
+  "apiKey": "AIzaSyD13xt6XuV644_svB1X0ZyoSBiprhGk2tY",
+  "authDomain": "chatme-fb268.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "chatme-fb268.firebasestorage.app",
+  "messagingSenderId": "919231382236",
+  "measurementId": "G-YXB64JH8E5"
 }
