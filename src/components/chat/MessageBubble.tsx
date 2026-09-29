@@ -216,15 +216,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <div
           className={`rounded-2xl px-3.5 py-2.5 shadow-sm transition-colors ${
             message.isDeleted
-              ? 'italic border border-slate-800 bg-slate-900/60 text-slate-500'
+              ? 'italic border border-[#222d34] bg-[#111b21]/80 text-[#8696a0]'
               : isSelf
-              ? 'bg-gradient-to-tr from-emerald-600 to-teal-600 text-white rounded-tr-xs shadow-emerald-950/20'
-              : 'bg-slate-800/90 text-slate-100 rounded-tl-xs border border-slate-700/50'
+              ? 'bg-[#005c4b] text-[#e9edef] rounded-tr-xs shadow-[#0b141a]/30'
+              : 'bg-[#202c33] text-[#e9edef] rounded-tl-xs border border-[#222d34]/60'
           }`}
         >
           {/* Sender header in groups */}
           {!isSelf && isGroup && (
-            <div className="mb-1 text-[11px] font-semibold text-emerald-400">
+            <div className="mb-1 text-[11px] font-semibold text-[#25d366]">
               {senderName}
             </div>
           )}
@@ -233,18 +233,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {message.replyTo && (
             <div
               onClick={() => onScrollToMessage && onScrollToMessage(message.replyTo!.messageId)}
-              className={`mb-2 flex items-start gap-1.5 rounded-xl border-l-2 p-2 text-xs cursor-pointer select-none transition ${
+              className={`mb-2 flex items-start gap-1.5 rounded-xl border-l-3 p-2 text-xs cursor-pointer select-none transition ${
                 isSelf
-                  ? 'border-white/70 bg-black/20 text-white/90 hover:bg-black/30'
-                  : 'border-emerald-500 bg-slate-900/60 text-slate-300 hover:bg-slate-900'
+                  ? 'border-[#25d366] bg-[#025143] text-[#e9edef] hover:bg-[#024337]'
+                  : 'border-[#25d366] bg-[#111b21] text-[#8696a0] hover:bg-[#0b141a]'
               }`}
             >
-              <CornerDownRight className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 opacity-70" />
+              <CornerDownRight className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-[#25d366]" />
               <div className="truncate">
-                <span className="font-semibold block text-[11px] opacity-90">
+                <span className="font-semibold block text-[11px] text-[#25d366]">
                   {message.replyTo.senderName}
                 </span>
-                <span className="truncate block opacity-80">{message.replyTo.text}</span>
+                <span className="truncate block opacity-85">{message.replyTo.text}</span>
               </div>
             </div>
           )}

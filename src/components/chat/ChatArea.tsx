@@ -22,6 +22,7 @@ import { MediaViewerModal } from './MediaViewerModal';
 import { Modal } from '../common/Modal';
 import { MessagesSkeleton } from '../common/LoadingSkeleton';
 import { EmptyState } from '../common/EmptyState';
+import { Realistic3DIcon } from '../common/Realistic3DIcon';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -142,25 +143,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   if (!activeConversation) {
     return (
-      <div className="flex h-full flex-1 flex-col items-center justify-center bg-slate-950 p-6 select-none">
-        <EmptyState
-          icon={MessageSquare}
-          title="Select a conversation"
-          description="Choose a conversation from the sidebar or start a new chat with your contacts to begin messaging."
-        />
+      <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#0b141a] p-6 select-none whatsapp-chat-bg text-center">
+        <div className="mb-4">
+          <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
+        </div>
+        <h3 className="text-base font-bold text-[#e9edef] mt-2">Chattr for Web & Mobile</h3>
+        <p className="mt-1.5 max-w-sm text-xs text-[#8696a0] leading-relaxed">
+          Send and receive messages in real time with teachers, students, parents, and school staff.
+        </p>
+        <div className="mt-6 flex items-center gap-1.5 text-[11px] text-[#8696a0] bg-[#111b21] px-3.5 py-1.5 rounded-full border border-[#222d34]">
+          <Lock className="h-3 w-3 text-[#25d366]" />
+          <span>Protected with Zero-Trust Firestore Security</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-slate-950 relative overflow-hidden select-none">
-      {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/90 px-4 py-3 backdrop-blur-xl z-10">
+    <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
+      {/* Top Header - WhatsApp Styling */}
+      <div className="flex items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           {/* Mobile Back Button */}
           <button
             onClick={onBackMobile}
-            className="md:hidden rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+            className="md:hidden rounded-xl p-1.5 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -175,20 +182,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
 
           <div className="min-w-0 cursor-pointer" onClick={onToggleDetails}>
-            <h3 className="text-xs font-bold text-white truncate hover:text-emerald-400 transition-colors">
+            <h3 className="text-xs font-bold text-[#e9edef] truncate hover:text-[#25d366] transition-colors">
               {title}
             </h3>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
+            <div className="flex items-center gap-1.5 text-[11px] text-[#8696a0] truncate">
               {typingUsers.length > 0 ? (
-                <span className="text-emerald-400 font-medium animate-pulse">
+                <span className="text-[#25d366] font-medium animate-pulse">
                   {typingText()}
                 </span>
               ) : isDirect ? (
                 isPartnerOnline ? (
-                  <span className="text-emerald-400 font-medium">Online</span>
+                  <span className="text-[#25d366] font-medium">online</span>
                 ) : (
                   <span>
-                    Last seen{' '}
+                    last seen{' '}
                     {partnerProfile?.lastSeen
                       ? new Date(partnerProfile.lastSeen).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -210,8 +217,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             onClick={() => setSearchInChat(!searchInChat)}
             className={`rounded-xl p-2 transition ${
               searchInChat
-                ? 'bg-emerald-500/20 text-emerald-400'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                ? 'bg-[#005c4b] text-[#25d366]'
+                : 'text-[#8696a0] hover:bg-[#111b21] hover:text-white'
             }`}
             title="Search messages in chat"
           >
@@ -220,7 +227,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           <button
             onClick={onToggleDetails}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+            className="rounded-xl p-2 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
             title="Conversation details"
           >
             <Info className="h-4 w-4" />
@@ -230,20 +237,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* In-Chat Search Bar */}
       {searchInChat && (
-        <div className="border-b border-slate-800 bg-slate-900/90 px-4 py-2 flex items-center gap-2 animate-in fade-in">
-          <Search className="h-4 w-4 text-slate-500" />
+        <div className="border-b border-[#222d34] bg-[#202c33] px-4 py-2 flex items-center gap-2 animate-in fade-in">
+          <Search className="h-4 w-4 text-[#8696a0]" />
           <input
             type="text"
             value={chatSearchTerm}
             onChange={(e) => setChatSearchTerm(e.target.value)}
-            placeholder="Search within this conversation..."
-            className="flex-1 bg-transparent text-xs text-white placeholder:text-slate-500 focus:outline-none"
+            placeholder="Search within this chat..."
+            className="flex-1 bg-transparent text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none"
             autoFocus
           />
           {chatSearchTerm && (
             <button
               onClick={() => setChatSearchTerm('')}
-              className="text-xs text-slate-400 hover:text-white"
+              className="text-xs text-[#8696a0] hover:text-[#e9edef]"
             >
               Clear
             </button>
@@ -251,11 +258,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      {/* Messages Scroll Container */}
+      {/* Messages Scroll Container with WhatsApp Background */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-1 relative"
+        className="flex-1 overflow-y-auto p-4 space-y-1 relative whatsapp-chat-bg"
       >
         {loadingMessages ? (
           <MessagesSkeleton />

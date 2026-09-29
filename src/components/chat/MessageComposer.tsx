@@ -103,12 +103,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   return (
-    <div className="relative border-t border-slate-800/80 bg-slate-900/95 px-4 py-3 select-none">
+    <div className="relative border-t border-[#222d34] bg-[#202c33] px-3.5 py-2.5 select-none">
       {/* Upload Progress Bar */}
       {uploadProgress !== null && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-slate-800 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#111b21] overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200"
+            className="h-full bg-gradient-to-r from-[#25d366] to-[#128c7e] transition-all duration-200"
             style={{ width: `${uploadProgress}%` }}
           />
         </div>
@@ -116,19 +116,19 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
       {/* Reply Banner */}
       {replyingTo && (
-        <div className="mb-2 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-2 px-3 text-xs text-emerald-200 animate-in fade-in">
+        <div className="mb-2 flex items-center justify-between rounded-xl border border-[#25d366]/30 bg-[#111b21] p-2 px-3 text-xs text-[#25d366] animate-in fade-in">
           <div className="flex items-center gap-2 truncate">
-            <CornerDownRight className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+            <CornerDownRight className="h-4 w-4 text-[#25d366] flex-shrink-0" />
             <div className="truncate">
-              <span className="font-semibold text-emerald-300">
+              <span className="font-semibold text-[#25d366]">
                 Replying to {replyingTo.senderName}:
               </span>{' '}
-              <span className="opacity-80 truncate">{replyingTo.text}</span>
+              <span className="opacity-80 truncate text-[#8696a0]">{replyingTo.text}</span>
             </div>
           </div>
           <button
             onClick={() => setReplyingTo(null)}
-            className="rounded p-1 text-emerald-400 hover:text-white"
+            className="rounded p-1 text-[#8696a0] hover:text-white"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -147,12 +147,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         <div className="flex items-end gap-2">
           {/* Emoji Picker Popup */}
           {showEmojiPicker && (
-            <div className="absolute bottom-16 left-4 z-30 grid grid-cols-8 gap-1.5 rounded-2xl border border-slate-700 bg-slate-900 p-3 shadow-2xl backdrop-blur-md animate-in fade-in">
+            <div className="absolute bottom-16 left-4 z-30 grid grid-cols-8 gap-1.5 rounded-2xl border border-[#222d34] bg-[#202c33] p-3 shadow-2xl backdrop-blur-md animate-in fade-in">
               {EMOJI_LIST.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => handleEmojiClick(emoji)}
-                  className="rounded-lg p-1.5 text-lg hover:bg-slate-800 hover:scale-120 transition"
+                  className="rounded-lg p-1.5 text-lg hover:bg-[#111b21] hover:scale-120 transition"
                 >
                   {emoji}
                 </button>
@@ -162,19 +162,19 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
           {/* Attachment Popup */}
           {showAttachMenu && (
-            <div className="absolute bottom-16 left-12 z-30 flex flex-col gap-1 rounded-2xl border border-slate-700 bg-slate-900 p-2 shadow-2xl backdrop-blur-md animate-in fade-in w-40">
+            <div className="absolute bottom-16 left-12 z-30 flex flex-col gap-1 rounded-2xl border border-[#222d34] bg-[#202c33] p-2 shadow-2xl backdrop-blur-md animate-in fade-in w-44">
               <button
                 onClick={() => imageInputRef.current?.click()}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition"
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
-                <ImageIcon className="h-4 w-4 text-emerald-400" />
+                <ImageIcon className="h-4 w-4 text-[#25d366]" />
                 <span>Photos & Media</span>
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition"
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
-                <FileIcon className="h-4 w-4 text-cyan-400" />
+                <FileIcon className="h-4 w-4 text-[#53bdeb]" />
                 <span>Document</span>
               </button>
             </div>
@@ -201,7 +201,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               setShowEmojiPicker(!showEmojiPicker);
               setShowAttachMenu(false);
             }}
-            className="rounded-xl p-2.5 text-slate-400 hover:bg-slate-800 hover:text-emerald-400 transition"
+            className="rounded-xl p-2.5 text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition"
             title="Emoji"
           >
             <Smile className="h-5 w-5" />
@@ -212,7 +212,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               setShowAttachMenu(!showAttachMenu);
               setShowEmojiPicker(false);
             }}
-            className="rounded-xl p-2.5 text-slate-400 hover:bg-slate-800 hover:text-cyan-400 transition"
+            className="rounded-xl p-2.5 text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition"
             title="Attach file or photo"
           >
             <Paperclip className="h-5 w-5" />
@@ -227,7 +227,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="w-full resize-none rounded-2xl border border-slate-700/80 bg-slate-800/70 px-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition max-h-32"
+              className="w-full resize-none rounded-2xl border-none bg-[#2a3942] px-4 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none transition max-h-32"
             />
           </div>
 
@@ -235,7 +235,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           {text.trim() ? (
             <button
               onClick={handleSend}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 transition"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-md hover:bg-[#009374] transition"
               title="Send message"
             >
               <Send className="h-4 w-4" />
@@ -243,7 +243,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           ) : (
             <button
               onClick={voiceRecorder.startRecording}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-slate-800 text-slate-300 hover:bg-emerald-600 hover:text-white transition"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#202c33] text-[#8696a0] hover:bg-[#00a884] hover:text-white transition"
               title="Hold to record voice message"
             >
               <Mic className="h-4 w-4" />

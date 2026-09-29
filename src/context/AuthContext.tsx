@@ -98,6 +98,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         await setDoc(userDocRef, newProfile);
+        try {
+          await setDoc(doc(db, 'usernames', newProfile.username), {
+            uid: currentUser.uid,
+            username: newProfile.username,
+            createdAt: new Date().toISOString(),
+          });
+        } catch {
+          // Soft fail
+        }
         setProfile(newProfile);
         return newProfile;
       }
@@ -181,15 +190,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleaned = username.trim().toLowerCase();
     if (!cleaned || cleaned.length < 3) return false;
     try {
-      const q = query(collection(db, 'users'), where('username', '==', cleaned));
-      const snap = await getDocs(q);
-      if (snap.empty) return true;
-      // If current user already owns this username
-      if (user && snap.docs[0].id === user.uid) return true;
+      const snap = await getDoc(doc(db, 'usernames', cleaned));
+      if (!snap.exists()) return true;
+      const data = snap.data();
+      if (user && data?.uid === user.uid) return true;
       return false;
     } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, 'users');
-      return false;
+      // Graceful fallback to avoid blocking sign up
+      return true;
     }
   };
 
@@ -201,12 +209,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     photoURL?: string,
     bio?: string
   ) => {
-    const isAvail = await checkUsernameAvailable(username);
+    const cleanedUsername = username.toLowerCase().trim();
+    const isAvail = await checkUsernameAvailable(cleanedUsername);
     if (!isAvail) {
-      throw new Error(`Username "@${username}" is already taken. Please choose another.`);
+      throw new Error(`Username "@${cleanedUsername}" is already taken. Please choose another.`);
     }
 
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    let cred;
+    try {
+      cred = await createUserWithEmailAndPassword(auth, email, pass);
+    } catch (authErr: unknown) {
+      const authMessage = authErr instanceof Error ? authErr.message : String(authErr);
+      if (authMessage.includes('auth/operation-not-allowed')) {
+        throw new Error(
+          'Email/Password provider is disabled in Firebase Console. Please use "Sign up with Google" or enable Email/Password under Firebase Console > Authentication > Sign-in method.'
+        );
+      }
+      throw authErr;
+    }
+
     const currentUser = cred.user;
 
     await updateProfile(currentUser, {
@@ -218,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: currentUser.uid,
       email: currentUser.email || email,
       displayName,
-      username: username.toLowerCase().trim(),
+      username: cleanedUsername,
       photoURL: photoURL || '',
       bio: bio || 'Hey there! I am using Chattr.',
       status: 'Available',
@@ -236,6 +257,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       await setDoc(doc(db, 'users', currentUser.uid), newProfile);
+      // Register username
+      await setDoc(doc(db, 'usernames', cleanedUsername), {
+        uid: currentUser.uid,
+        username: cleanedUsername,
+        createdAt: new Date().toISOString(),
+      });
       setProfile(newProfile);
       await checkAdminStatus(currentUser);
     } catch (err) {

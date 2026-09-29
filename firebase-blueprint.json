@@ -112,9 +112,24 @@
         "assignedAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["role", "email"]
+    },
+    "Username": {
+      "title": "Username",
+      "description": "Unique username registry",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 50, "pattern": "^[a-z0-9_]{3,30}$" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "username"]
     }
   },
   "firestore": {
+    "/usernames/{username}": {
+      "schema": "Username",
+      "description": "Public unique username mapping to user ID"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profile documents"

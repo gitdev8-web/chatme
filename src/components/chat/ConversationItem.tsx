@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Pin, VolumeX, Check, CheckCheck, MoreVertical, Archive, Trash2 } from 'lucide-react';
 import { Conversation, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
+import { Realistic3DIcon } from '../common/Realistic3DIcon';
 import {
   toggleArchiveConversation,
   toggleMuteConversation,
@@ -41,7 +42,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const title = isDirect
     ? partnerProfile?.displayName || 'Direct Message'
-    : conversation.name || 'Group Chat';
+    : conversation.name || 'Class / Group';
 
   const avatarSrc = isDirect
     ? partnerProfile?.photoURL
@@ -96,39 +97,51 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
       onClick={() => onSelect(conversation.id)}
       className={`group relative flex items-center gap-3.5 px-3.5 py-3 rounded-2xl cursor-pointer transition-all duration-150 select-none ${
         isActive
-          ? 'bg-slate-800/90 text-white shadow-md shadow-slate-950/20 ring-1 ring-emerald-500/20'
-          : 'hover:bg-slate-800/40 text-slate-300'
+          ? 'bg-[#202c33] text-white shadow-md shadow-[#0b141a]/40 border-l-4 border-l-[#25d366]'
+          : 'hover:bg-[#202c33]/60 text-[#8696a0]'
       }`}
     >
-      {/* Avatar */}
-      <Avatar
-        src={avatarSrc}
-        name={title}
-        size="md"
-        isOnline={isOnline}
-        showPresence={isDirect}
-      />
+      {/* 3D Icon or Avatar */}
+      {!isDirect && !avatarSrc ? (
+        <Realistic3DIcon
+          name={conversation.name?.toLowerCase().includes('staff') ? 'staff' : 'classes'}
+          size="md"
+          showDots={false}
+        />
+      ) : (
+        <Avatar
+          src={avatarSrc}
+          name={title}
+          size="md"
+          isOnline={isOnline}
+          showPresence={isDirect}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1 mb-1">
           <span
             className={`text-xs font-semibold truncate ${
-              isActive ? 'text-white' : 'text-slate-200'
+              isActive ? 'text-[#e9edef]' : 'text-[#e9edef]'
             }`}
           >
             {title}
           </span>
-          <span className="text-[10px] text-slate-400 flex-shrink-0 font-medium">
+          <span
+            className={`text-[10px] flex-shrink-0 font-medium ${
+              unreadCount > 0 ? 'text-[#25d366]' : 'text-[#8696a0]'
+            }`}
+          >
             {formatTime(conversation.lastMessage?.timestamp || conversation.updatedAt)}
           </span>
         </div>
 
         <div className="flex items-center justify-between gap-2">
           {/* Last message preview */}
-          <div className="flex items-center gap-1 min-w-0 text-xs text-slate-400">
+          <div className="flex items-center gap-1 min-w-0 text-xs text-[#8696a0]">
             {conversation.lastMessage?.senderId === currentUserId && (
-              <CheckCheck className="h-3 w-3 text-emerald-400 flex-shrink-0" />
+              <CheckCheck className="h-3 w-3 text-[#53bdeb] flex-shrink-0" />
             )}
             <span className="truncate">
               {conversation.lastMessage?.text || 'No messages yet'}
@@ -137,10 +150,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
           {/* Badges / Status Icons */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {isMuted && <VolumeX className="h-3.5 w-3.5 text-slate-500" />}
-            {isPinned && <Pin className="h-3.5 w-3.5 text-emerald-400 rotate-45" />}
+            {isMuted && <VolumeX className="h-3.5 w-3.5 text-[#8696a0]" />}
+            {isPinned && <Pin className="h-3.5 w-3.5 text-[#25d366] rotate-45" />}
             {unreadCount > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-slate-950 shadow-sm">
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#25d366] px-1 text-[10px] font-bold text-[#0b141a] shadow-sm">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
@@ -154,7 +167,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-100 transition-opacity rounded-md hover:bg-slate-700/50"
+        className="opacity-0 group-hover:opacity-100 p-1 text-[#8696a0] hover:text-[#e9edef] transition-opacity rounded-md hover:bg-[#111b21]"
       >
         <MoreVertical className="h-3.5 w-3.5" />
       </button>
@@ -163,25 +176,25 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
       {showMenu && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-3 top-10 z-30 w-36 rounded-xl border border-slate-700/80 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in"
+          className="absolute right-3 top-10 z-30 w-36 rounded-xl border border-[#222d34] bg-[#202c33] p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in"
         >
           <button
             onClick={handleTogglePin}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800 transition"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-[#e9edef] hover:bg-[#111b21] transition"
           >
-            <Pin className="h-3.5 w-3.5 text-emerald-400" />
+            <Pin className="h-3.5 w-3.5 text-[#25d366]" />
             <span>{isPinned ? 'Unpin' : 'Pin'}</span>
           </button>
           <button
             onClick={handleToggleMute}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800 transition"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-[#e9edef] hover:bg-[#111b21] transition"
           >
             <VolumeX className="h-3.5 w-3.5 text-amber-400" />
             <span>{isMuted ? 'Unmute' : 'Mute'}</span>
           </button>
           <button
             onClick={handleToggleArchive}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800 transition"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-[#e9edef] hover:bg-[#111b21] transition"
           >
             <Archive className="h-3.5 w-3.5 text-cyan-400" />
             <span>{isArchived ? 'Unarchive' : 'Archive'}</span>

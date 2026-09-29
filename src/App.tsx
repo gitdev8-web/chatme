@@ -17,11 +17,15 @@ import { CreateGroupModal } from './components/groups/CreateGroupModal';
 import { ProfileModal } from './components/profile/ProfileModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
+import { SchoolHubModal } from './components/campus/SchoolHubModal';
+import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
+import { Realistic3DIcon } from './components/common/Realistic3DIcon';
 
 const MainChatDashboard: React.FC = () => {
   const { user } = useAuth();
   const {
+    conversations,
     activeConversationId,
     activeConversation,
     messages,
@@ -29,6 +33,7 @@ const MainChatDashboard: React.FC = () => {
     setActiveConversationId,
     showChatDetails,
     setShowChatDetails,
+    setActiveFilter,
   } = useChat();
 
   const [isContactsOpen, setIsContactsOpen] = useState(false);
@@ -36,9 +41,33 @@ const MainChatDashboard: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isSchoolHubOpen, setIsSchoolHubOpen] = useState(false);
+  const [activeBottomTab, setActiveBottomTab] = useState<BottomNavTab>('chats');
+
+  // Compute total unread across all chats
+  const totalUnread = conversations.reduce((acc, conv) => {
+    return acc + (conv.unreadCounts?.[user?.uid || ''] || 0);
+  }, 0);
+
+  const handleBottomTabChange = (tab: BottomNavTab) => {
+    setActiveBottomTab(tab);
+    if (tab === 'chats') {
+      setActiveConversationId(null);
+      setActiveFilter('all');
+    } else if (tab === 'contacts') {
+      setIsContactsOpen(true);
+    } else if (tab === 'hub') {
+      setIsSchoolHubOpen(true);
+    } else if (tab === 'notices') {
+      setActiveConversationId(null);
+      setActiveFilter('groups');
+    } else if (tab === 'settings') {
+      setIsSettingsOpen(true);
+    }
+  };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 antialiased select-none">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0b141a] text-[#e9edef] antialiased select-none relative">
       <OfflineBanner />
 
       {/* Sidebar: Visible on desktop or when no chat is active on mobile */}
@@ -53,6 +82,7 @@ const MainChatDashboard: React.FC = () => {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenAdmin={() => setIsAdminOpen(true)}
           onOpenProfile={() => setIsProfileOpen(true)}
+          onOpenSchoolHub={() => setIsSchoolHubOpen(true)}
         />
       </div>
 
@@ -81,10 +111,37 @@ const MainChatDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* WhatsApp Mobile Bottom Navigation */}
+      {!activeConversationId && (
+        <BottomNav
+          activeTab={activeBottomTab}
+          onTabChange={handleBottomTabChange}
+          unreadCount={totalUnread}
+        />
+      )}
+
       {/* Modals */}
+      <SchoolHubModal
+        isOpen={isSchoolHubOpen}
+        onClose={() => {
+          setIsSchoolHubOpen(false);
+          setActiveBottomTab('chats');
+        }}
+        onSelectModule={(mod) => {
+          if (mod === 'messages' || mod === 'notices') {
+            setActiveFilter(mod === 'messages' ? 'direct' : 'groups');
+          } else {
+            setIsContactsOpen(true);
+          }
+        }}
+      />
+
       <ContactsModal
         isOpen={isContactsOpen}
-        onClose={() => setIsContactsOpen(false)}
+        onClose={() => {
+          setIsContactsOpen(false);
+          setActiveBottomTab('chats');
+        }}
       />
 
       <CreateGroupModal
@@ -99,7 +156,10 @@ const MainChatDashboard: React.FC = () => {
 
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          setActiveBottomTab('chats');
+        }}
         onOpenProfile={() => setIsProfileOpen(true)}
       />
 
@@ -117,15 +177,15 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center bg-slate-950 text-slate-100 select-none">
-        <div className="relative flex items-center justify-center mb-6">
-          <div className="absolute h-20 w-20 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
-          <img src="/icon.svg" alt="Chattr" className="h-16 w-16 relative z-10 animate-bounce" />
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
+        <div className="mb-4">
+          <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-          <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Chattr</span>
+        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
+          <span>Chattr</span>
+          <span className="text-[#25d366]">Campus</span>
         </h2>
-        <p className="mt-2 text-xs text-slate-400">Connecting to secure messaging network...</p>
+        <p className="mt-2 text-xs text-[#8696a0]">Connecting to secure school messaging channels...</p>
       </div>
     );
   }

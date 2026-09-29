@@ -35,6 +35,14 @@ service cloud.firestore {
       return resource.data;
     }
 
+    // Usernames Unique Public Index
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().uid == request.auth.uid;
+      allow update: if isSignedIn() && (incoming().uid == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
     // Users Collection
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -58,7 +66,8 @@ service cloud.firestore {
     // Conversations Collection
     match /conversations/{conversationId} {
       allow read: if isSignedIn() && (
-        (resource != null && request.auth.uid in resource.data.participantIds) ||
+        resource == null ||
+        request.auth.uid in resource.data.participantIds ||
         isAdmin()
       );
 

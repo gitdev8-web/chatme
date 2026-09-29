@@ -35,11 +35,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
       await loginWithEmail(email.trim(), password);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid credentials';
-      setError(
-        msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password')
-          ? 'Invalid email or password combination. Try again or reset password.'
-          : msg
-      );
+      if (msg.includes('auth/operation-not-allowed')) {
+        setError(
+          'Email/Password sign-in is disabled in your Firebase project. Please use "Sign in with Google" below.'
+        );
+      } else {
+        setError(
+          msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password')
+            ? 'Invalid email or password combination. Try again or reset password.'
+            : msg
+        );
+      }
     } finally {
       setLoading(false);
     }

@@ -59,12 +59,31 @@ export async function getOrCreateDirectConversation(
           [targetUid]: 0,
         },
       };
-      await setDoc(convRef, newConv);
+      await setDoc(convRef, newConv, { merge: true });
     }
     return conversationId;
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, `conversations/${conversationId}`);
-    return conversationId;
+    try {
+      const newConv: Conversation = {
+        id: conversationId,
+        type: 'direct',
+        participantIds: [currentUid, targetUid],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        pinnedBy: [],
+        mutedBy: [],
+        archivedBy: [],
+        unreadCounts: {
+          [currentUid]: 0,
+          [targetUid]: 0,
+        },
+      };
+      await setDoc(convRef, newConv, { merge: true });
+      return conversationId;
+    } catch (writeErr) {
+      handleFirestoreError(writeErr, OperationType.WRITE, `conversations/${conversationId}`);
+      return conversationId;
+    }
   }
 }
 
