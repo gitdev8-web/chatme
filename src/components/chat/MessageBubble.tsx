@@ -18,6 +18,7 @@ import {
   Pause,
   CornerDownRight,
   MoreHorizontal,
+  Forward,
 } from 'lucide-react';
 import { Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
@@ -34,6 +35,7 @@ interface MessageBubbleProps {
   onReact: (messageId: string, emoji: string) => void;
   onOpenMedia: (url: string, name?: string) => void;
   onScrollToMessage?: (messageId: string) => void;
+  onForward?: (msg: Message) => void;
 }
 
 const COMMON_EMOJIS = ['❤️', '👍', '😂', '🔥', '😮', '😢'];
@@ -49,6 +51,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onReact,
   onOpenMedia,
   onScrollToMessage,
+  onForward,
 }) => {
   const { showToast } = useToast();
   const [showActions, setShowActions] = useState(false);
@@ -164,6 +167,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             >
               <Reply className="h-3.5 w-3.5" />
             </button>
+            {onForward && (
+              <button
+                onClick={() => onForward(message)}
+                className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Forward"
+              >
+                <Forward className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={handleCopy}
               className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition"

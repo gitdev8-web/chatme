@@ -44,6 +44,30 @@ const MainChatDashboard: React.FC = () => {
   const [isSchoolHubOpen, setIsSchoolHubOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<BottomNavTab>('chats');
 
+  // Synchronize initial URL route on mount
+  React.useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/app/chat/')) {
+      const convId = path.replace('/app/chat/', '').trim();
+      if (convId) setActiveConversationId(convId);
+    } else if (path === '/app/contacts') {
+      setIsContactsOpen(true);
+    } else if (path === '/app/settings') {
+      setIsSettingsOpen(true);
+    } else if (path === '/admin') {
+      setIsAdminOpen(true);
+    }
+  }, [setActiveConversationId]);
+
+  // Update browser URL state as user navigates without reloads
+  React.useEffect(() => {
+    if (activeConversationId) {
+      window.history.replaceState(null, '', `/app/chat/${activeConversationId}`);
+    } else {
+      window.history.replaceState(null, '', '/app/chats');
+    }
+  }, [activeConversationId]);
+
   // Compute total unread across all chats
   const totalUnread = conversations.reduce((acc, conv) => {
     return acc + (conv.unreadCounts?.[user?.uid || ''] || 0);
@@ -173,7 +197,21 @@ const MainChatDashboard: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const [authView, setAuthView] = useState<'login' | 'register'>('login');
+  const [authView, setAuthView] = useState<'login' | 'register'>(
+    typeof window !== 'undefined' && window.location.pathname === '/register'
+      ? 'register'
+      : 'login'
+  );
+
+  React.useEffect(() => {
+    if (!user && !loading) {
+      if (window.location.pathname === '/register') {
+        setAuthView('register');
+      } else if (window.location.pathname === '/login') {
+        setAuthView('login');
+      }
+    }
+  }, [user, loading]);
 
   if (loading) {
     return (

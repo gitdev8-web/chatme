@@ -23,6 +23,7 @@ import { Modal } from '../common/Modal';
 import { MessagesSkeleton } from '../common/LoadingSkeleton';
 import { EmptyState } from '../common/EmptyState';
 import { Realistic3DIcon } from '../common/Realistic3DIcon';
+import { ForwardModal } from './ForwardModal';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -52,6 +53,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [chatSearchTerm, setChatSearchTerm] = useState('');
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [editText, setEditText] = useState('');
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [viewingMediaUrl, setViewingMediaUrl] = useState<string | null>(null);
   const [viewingMediaName, setViewingMediaName] = useState<string | undefined>(undefined);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -313,6 +315,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     setViewingMediaName(name);
                   }}
                   onScrollToMessage={handleScrollToMessage}
+                  onForward={(m) => setForwardingMessage(m)}
                 />
               </React.Fragment>
             );
@@ -336,6 +339,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <MessageComposer
         onSendTextMessage={sendTextMessage}
         onSendFileMessage={sendFileMessage}
+      />
+
+      {/* Forward Modal */}
+      <ForwardModal
+        message={forwardingMessage}
+        isOpen={!!forwardingMessage}
+        onClose={() => setForwardingMessage(null)}
       />
 
       {/* Edit Message Modal */}
