@@ -50,33 +50,33 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity duration-200"
+        className="fixed inset-0 bg-[#0b141a]/80 backdrop-blur-md transition-opacity duration-200"
         onClick={onClose}
       />
 
-      {/* Modal Card */}
+      {/* Modal Card - WhatsApp Theme */}
       <div
-        className={`relative z-10 w-full ${widthClasses[maxWidth]} overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95`}
+        className={`relative z-10 w-full ${widthClasses[maxWidth]} overflow-hidden rounded-2xl border border-[#222d34] bg-[#111b21] shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95 my-auto max-h-[90vh] flex flex-col`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#222d34] bg-[#202c33] px-5 py-3.5 flex-shrink-0">
           <div>
-            <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
-            {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+            <h3 className="text-sm sm:text-base font-bold text-[#e9edef]">{title}</h3>
+            {subtitle && <p className="mt-0.5 text-xs text-[#8696a0]">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+            className="rounded-xl p-1.5 text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="max-h-[80vh] overflow-y-auto p-6">{children}</div>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 no-scrollbar">{children}</div>
       </div>
     </div>
   );

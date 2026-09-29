@@ -19,9 +19,10 @@
         "showOnlineStatus": { "type": "boolean" },
         "showLastSeen": { "type": "boolean" },
         "readReceipts": { "type": "boolean" },
+        "phoneNumber": { "type": "string", "maxLength": 32 },
         "blockedUserIds": { "type": "array" }
       },
-      "required": ["uid", "email", "displayName", "username"]
+      "required": ["uid", "displayName", "username"]
     },
     "Conversation": {
       "title": "Conversation",

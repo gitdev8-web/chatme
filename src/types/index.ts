@@ -5,7 +5,8 @@
 
 export interface UserProfile {
   uid: string;
-  email: string;
+  email?: string;
+  phoneNumber?: string;
   displayName: string;
   username: string;
   photoURL?: string;

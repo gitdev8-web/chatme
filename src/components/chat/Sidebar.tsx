@@ -99,10 +99,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="flex h-full w-full flex-col border-r border-[#222d34] bg-[#111b21] select-none">
       {/* Top Header - WhatsApp Theme */}
-      <div className="flex items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3.5 py-3">
+      <div className="flex items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3 py-2.5 sm:px-3.5 sm:py-3">
         <div
           onClick={onOpenProfile}
-          className="flex items-center gap-2.5 cursor-pointer group"
+          className="flex items-center gap-2 cursor-pointer group min-w-0"
           title="My Profile"
         >
           <Avatar
@@ -112,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             isOnline={true}
             showPresence={true}
           />
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-[90px] sm:max-w-[140px]">
             <h2 className="text-xs font-bold text-[#e9edef] truncate group-hover:text-[#25d366] transition-colors">
               {profile?.displayName || 'My Profile'}
             </h2>
@@ -123,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* 3D Action icons toolbar */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
           {/* School Hub 3D Icon */}
           <div
             onClick={onOpenSchoolHub}

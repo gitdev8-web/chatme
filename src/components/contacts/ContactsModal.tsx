@@ -61,7 +61,8 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     return (
       u.displayName.toLowerCase().includes(term) ||
       u.username.toLowerCase().includes(term) ||
-      u.email.toLowerCase().includes(term)
+      (u.email && u.email.toLowerCase().includes(term)) ||
+      (u.phoneNumber && u.phoneNumber.includes(term))
     );
   });
 

@@ -11,9 +11,13 @@ import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface LoginViewProps {
   onSwitchToRegister: () => void;
+  onSwitchToPhone?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
+export const LoginView: React.FC<LoginViewProps> = ({
+  onSwitchToRegister,
+  onSwitchToPhone,
+}) => {
   const { loginWithEmail, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -199,8 +203,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
             <span>Sign in with Google</span>
           </button>
 
+          {/* Switch to Phone Auth */}
+          {onSwitchToPhone && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={onSwitchToPhone}
+                className="text-xs font-semibold text-[#25d366] hover:underline transition"
+              >
+                📱 Sign in with Phone Number
+              </button>
+            </div>
+          )}
+
           {/* Switch to Register */}
-          <div className="mt-6 text-center text-xs text-slate-400">
+          <div className="mt-4 text-center text-xs text-slate-400">
             Don't have a Chattr account?{' '}
             <button
               onClick={onSwitchToRegister}

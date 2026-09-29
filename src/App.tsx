@@ -9,6 +9,7 @@ import { ChatProvider, useChat } from './context/ChatContext';
 import { ToastProvider } from './components/common/Toast';
 import { LoginView } from './components/auth/LoginView';
 import { RegisterView } from './components/auth/RegisterView';
+import { PhoneAuthView } from './components/auth/PhoneAuthView';
 import { Sidebar } from './components/chat/Sidebar';
 import { ChatArea } from './components/chat/ChatArea';
 import { ChatDetailsSidebar } from './components/chat/ChatDetailsSidebar';
@@ -91,14 +92,14 @@ const MainChatDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0b141a] text-[#e9edef] antialiased select-none relative">
+    <div className="flex h-[100dvh] w-screen overflow-hidden bg-[#0b141a] text-[#e9edef] antialiased select-none relative">
       <OfflineBanner />
 
       {/* Sidebar: Visible on desktop or when no chat is active on mobile */}
       <div
         className={`${
           activeConversationId ? 'hidden md:flex' : 'flex'
-        } w-full md:w-80 lg:w-96 flex-shrink-0 h-full`}
+        } w-full md:w-80 lg:w-[360px] xl:w-[390px] flex-shrink-0 h-full overflow-hidden`}
       >
         <Sidebar
           onOpenContacts={() => setIsContactsOpen(true)}
@@ -114,7 +115,7 @@ const MainChatDashboard: React.FC = () => {
       <div
         className={`${
           activeConversationId ? 'flex' : 'hidden md:flex'
-        } flex-1 h-full min-w-0`}
+        } flex-1 h-full min-w-0 overflow-hidden`}
       >
         <ChatArea
           onBackMobile={() => setActiveConversationId(null)}
@@ -196,26 +197,28 @@ const MainChatDashboard: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { user, loading } = useAuth();
-  const [authView, setAuthView] = useState<'login' | 'register'>(
+  const { user, profile, loading } = useAuth();
+  const [authView, setAuthView] = useState<'phone' | 'email-login' | 'email-register'>(
     typeof window !== 'undefined' && window.location.pathname === '/register'
-      ? 'register'
-      : 'login'
+      ? 'email-register'
+      : typeof window !== 'undefined' && window.location.pathname === '/login'
+      ? 'email-login'
+      : 'phone'
   );
 
   React.useEffect(() => {
     if (!user && !loading) {
       if (window.location.pathname === '/register') {
-        setAuthView('register');
+        setAuthView('email-register');
       } else if (window.location.pathname === '/login') {
-        setAuthView('login');
+        setAuthView('email-login');
       }
     }
   }, [user, loading]);
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
+      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
         <div className="mb-4">
           <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
         </div>
@@ -228,12 +231,30 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Not authenticated: default to PhoneAuthView
   if (!user) {
-    return authView === 'login' ? (
-      <LoginView onSwitchToRegister={() => setAuthView('register')} />
-    ) : (
-      <RegisterView onSwitchToLogin={() => setAuthView('login')} />
-    );
+    if (authView === 'email-login') {
+      return (
+        <LoginView
+          onSwitchToRegister={() => setAuthView('email-register')}
+          onSwitchToPhone={() => setAuthView('phone')}
+        />
+      );
+    }
+    if (authView === 'email-register') {
+      return (
+        <RegisterView
+          onSwitchToLogin={() => setAuthView('email-login')}
+          onSwitchToPhone={() => setAuthView('phone')}
+        />
+      );
+    }
+    return <PhoneAuthView onSwitchToEmail={() => setAuthView('email-login')} />;
+  }
+
+  // Authenticated via phone or Google, but profile setup pending
+  if (!profile) {
+    return <PhoneAuthView />;
   }
 
   return (

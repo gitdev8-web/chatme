@@ -9,6 +9,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInAnonymously,
   GoogleAuthProvider,
   signOut,
   sendPasswordResetEmail,
@@ -50,6 +51,13 @@ interface AuthContextType {
   updateProfileData: (updates: Partial<UserProfile>) => Promise<void>;
   deleteAccount: () => Promise<void>;
   checkUsernameAvailable: (username: string) => Promise<boolean>;
+  completeProfileSetup: (
+    displayName: string,
+    username: string,
+    photoURL?: string,
+    bio?: string
+  ) => Promise<UserProfile>;
+  demoPhoneLogin: (phoneNumber?: string, testName?: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -336,6 +344,120 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const completeProfileSetup = async (
+    displayName: string,
+    username: string,
+    photoURL?: string,
+    bio?: string
+  ): Promise<UserProfile> => {
+    if (!auth.currentUser) throw new Error('User not authenticated');
+    const currentUser = auth.currentUser;
+    const cleanedUsername = username.toLowerCase().trim();
+
+    const isAvail = await checkUsernameAvailable(cleanedUsername);
+    if (!isAvail) {
+      throw new Error(`Username "@${cleanedUsername}" is already taken.`);
+    }
+
+    await updateProfile(currentUser, {
+      displayName,
+      photoURL: photoURL || '',
+    });
+
+    const newProfile: UserProfile = {
+      uid: currentUser.uid,
+      phoneNumber: currentUser.phoneNumber || '',
+      email: currentUser.email || '',
+      displayName,
+      username: cleanedUsername,
+      photoURL: photoURL || '',
+      bio: bio || 'Hey there! I am using Chattr.',
+      status: 'Available',
+      isOnline: true,
+      lastSeen: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      showOnlineStatus: true,
+      showLastSeen: true,
+      readReceipts: true,
+      enterToSend: true,
+      theme: 'dark',
+      blockedUserIds: [],
+    };
+
+    await setDoc(doc(db, 'users', currentUser.uid), newProfile);
+    try {
+      await setDoc(doc(db, 'usernames', cleanedUsername), {
+        uid: currentUser.uid,
+        username: cleanedUsername,
+        createdAt: new Date().toISOString(),
+      });
+    } catch {
+      // ignore
+    }
+    setProfile(newProfile);
+    return newProfile;
+  };
+
+  const demoPhoneLogin = async (
+    phoneNumber: string = '+256700123456',
+    testName: string = 'Chattr User'
+  ) => {
+    let currentUser: User;
+    try {
+      const cred = await signInAnonymously(auth);
+      currentUser = cred.user;
+    } catch {
+      try {
+        const dummyEmail = `demo_${phoneNumber.replace(/[^0-9]/g, '') || '700123456'}@chattr.local`;
+        const dummyPass = 'ChattrDemo2026!';
+        const cred = await signInWithEmailAndPassword(auth, dummyEmail, dummyPass);
+        currentUser = cred.user;
+      } catch {
+        const dummyEmail = `demo_${phoneNumber.replace(/[^0-9]/g, '') || '700123456'}@chattr.local`;
+        const dummyPass = 'ChattrDemo2026!';
+        const cred = await createUserWithEmailAndPassword(auth, dummyEmail, dummyPass);
+        currentUser = cred.user;
+      }
+    }
+
+    setUser(currentUser);
+    const existing = await fetchUserProfile(currentUser);
+    if (!existing) {
+      const baseUsername = `user_${phoneNumber.replace(/[^0-9]/g, '').slice(-5) || currentUser.uid.slice(0, 5)}`;
+      const demoProfile: UserProfile = {
+        uid: currentUser.uid,
+        phoneNumber,
+        displayName: testName,
+        username: baseUsername,
+        photoURL: '',
+        bio: 'Hey there! I am using Chattr.',
+        status: 'Available',
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        showOnlineStatus: true,
+        showLastSeen: true,
+        readReceipts: true,
+        enterToSend: true,
+        theme: 'dark',
+        blockedUserIds: [],
+      };
+      await setDoc(doc(db, 'users', currentUser.uid), demoProfile);
+      try {
+        await setDoc(doc(db, 'usernames', baseUsername), {
+          uid: currentUser.uid,
+          username: baseUsername,
+          createdAt: new Date().toISOString(),
+        });
+      } catch {
+        // ignore
+      }
+      setProfile(demoProfile);
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await fetchUserProfile(user);
@@ -357,6 +479,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfileData,
         deleteAccount,
         checkUsernameAvailable,
+        completeProfileSetup,
+        demoPhoneLogin,
         refreshProfile,
       }}
     >

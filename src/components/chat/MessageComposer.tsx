@@ -103,7 +103,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   return (
-    <div className="relative border-t border-[#222d34] bg-[#202c33] px-3.5 py-2.5 select-none">
+    <div className="relative border-t border-[#222d34] bg-[#202c33] px-3.5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] select-none">
       {/* Upload Progress Bar */}
       {uploadProgress !== null && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-[#111b21] overflow-hidden">

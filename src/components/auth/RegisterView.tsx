@@ -12,9 +12,13 @@ import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface RegisterViewProps {
   onSwitchToLogin: () => void;
+  onSwitchToPhone?: () => void;
 }
 
-export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) => {
+export const RegisterView: React.FC<RegisterViewProps> = ({
+  onSwitchToLogin,
+  onSwitchToPhone,
+}) => {
   const { registerWithEmail, loginWithGoogle, checkUsernameAvailable } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -354,7 +358,20 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) =
             </button>
           </form>
 
-          <div className="mt-5 text-center text-xs text-slate-400">
+          {/* Switch to Phone Auth */}
+          {onSwitchToPhone && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={onSwitchToPhone}
+                className="text-xs font-semibold text-[#25d366] hover:underline transition"
+              >
+                📱 Sign up with Phone Number
+              </button>
+            </div>
+          )}
+
+          <div className="mt-4 text-center text-xs text-slate-400">
             Already have an account?{' '}
             <button
               onClick={onSwitchToLogin}
