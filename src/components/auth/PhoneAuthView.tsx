@@ -14,6 +14,11 @@ import {
   ChevronDown,
   Edit2,
   Sparkles,
+  ExternalLink,
+  Info,
+  ShieldCheck,
+  Settings,
+  Copy,
 } from 'lucide-react';
 import {
   RecaptchaVerifier,
@@ -26,6 +31,8 @@ import { Avatar } from '../common/Avatar';
 import { uploadFileWithProgress } from '../../services/storageService';
 import { Realistic3DIcon } from '../common/Realistic3DIcon';
 import { PWAInstallButton } from '../common/PWAInstallButton';
+import { Modal } from '../common/Modal';
+import { useToast } from '../common/Toast';
 
 interface PhoneAuthViewProps {
   onSwitchToEmail?: () => void;
@@ -50,6 +57,11 @@ const POPULAR_COUNTRIES: Country[] = [
   { name: 'United Arab Emirates', code: '+971', flag: '🇦🇪' },
 ];
 
+const FIREBASE_CONSOLE_URL =
+  'https://console.firebase.google.com/project/gen-lang-client-0530556818/authentication/providers';
+const FIREBASE_SETTINGS_URL =
+  'https://console.firebase.google.com/project/gen-lang-client-0530556818/authentication/settings';
+
 export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail }) => {
   const {
     user,
@@ -59,6 +71,7 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
     completeProfileSetup,
     demoPhoneLogin,
   } = useAuth();
+  const { showToast } = useToast();
 
   // Wizard Steps: 1: Phone input, 2: OTP verification, 3: Profile info (if user signed in but profile incomplete)
   const [step, setStep] = useState<'phone' | 'otp' | 'profile'>('phone');
@@ -72,6 +85,8 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFirebaseConsoleError, setIsFirebaseConsoleError] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false);
 
   // OTP inputs
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
@@ -151,6 +166,7 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsFirebaseConsoleError(false);
 
     const cleaned = phoneNumber.replace(/[^0-9]/g, '');
     if (cleaned.length < 6) {
@@ -172,9 +188,22 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
       setOtp(['', '', '', '', '', '']);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('auth/operation-not-allowed')) {
+      if (
+        msg.includes('auth/operation-not-allowed') ||
+        msg.includes('CONFIGURATION_NOT_FOUND') ||
+        msg.includes('auth/admin-restricted-operation')
+      ) {
+        setIsFirebaseConsoleError(true);
         setError(
-          'Phone authentication is not enabled in Firebase Console. You can use the Quick Demo Login below or Sign in with Google.'
+          'Phone provider is not enabled in Firebase Console (project: gen-lang-client-0530556818). Click "Open Firebase Console" below to toggle Phone ON, or use Instant Demo Login.'
+        );
+      } else if (
+        msg.includes('auth/invalid-app-credential') ||
+        msg.includes('auth/app-not-authorized')
+      ) {
+        setIsFirebaseConsoleError(true);
+        setError(
+          'This web domain needs to be added to Firebase Authorized Domains. See setup instructions or use Demo Login.'
         );
       } else if (msg.includes('auth/invalid-phone-number')) {
         setError('The phone number format is invalid. Please check the country code and number.');
@@ -207,7 +236,6 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
     setLoading(true);
     try {
       const cred = await confirmationResult.confirm(code);
-      // If user profile does not exist yet, step 3 will show
       if (cred.user) {
         setStep('profile');
       }
@@ -366,6 +394,17 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
     }
   };
 
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    showToast(`Copied ${label} to clipboard`, 'success');
+  };
+
+  const fillTestNumber = () => {
+    setSelectedCountry(POPULAR_COUNTRIES[0]); // Uganda +256
+    setPhoneNumber('700123456');
+    showToast('Prefilled test number: +256 700 123456', 'info');
+  };
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0b141a] px-4 py-8 relative overflow-hidden select-none">
       {/* Hidden reCAPTCHA container for Firebase Phone Auth */}
@@ -390,6 +429,16 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
             {step === 'otp' && 'Enter the 6-digit code sent to your phone'}
             {step === 'profile' && 'Complete your profile setup'}
           </p>
+
+          {/* Firebase Phone Auth Setup Helper Link */}
+          <button
+            type="button"
+            onClick={() => setShowSetupModal(true)}
+            className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#111b21] px-3 py-1 text-[11px] font-medium text-[#25d366] border border-[#25d366]/30 hover:bg-[#202c33] transition"
+          >
+            <Settings className="h-3 w-3" />
+            <span>Firebase Phone Provider Setup Guide</span>
+          </button>
         </div>
 
         {/* Card Container */}
@@ -401,13 +450,35 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
                 <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
+
+              {isFirebaseConsoleError && (
+                <div className="mt-1 flex flex-col gap-1.5">
+                  <a
+                    href={FIREBASE_CONSOLE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#25d366] px-3 py-2 font-bold text-slate-950 hover:bg-[#22bf5b] transition"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Open Firebase Console to Enable Phone Provider</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupModal(true)}
+                    className="text-[11px] text-[#25d366] hover:underline text-center"
+                  >
+                    View step-by-step instructions
+                  </button>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleQuickDemo}
                 className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 py-1.5 font-semibold text-white hover:bg-[#009374] transition"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Instant 1-Click Demo Login</span>
+                <span>Instant 1-Click Demo Login (No SMS Required)</span>
               </button>
             </div>
           )}
@@ -469,9 +540,18 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
 
               {/* Phone Input */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
-                  Phone Number
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                    Phone Number
+                  </label>
+                  <button
+                    type="button"
+                    onClick={fillTestNumber}
+                    className="text-[10px] text-[#25d366] hover:underline"
+                  >
+                    Use test number
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <div className="flex items-center justify-center rounded-xl border border-[#222d34] bg-[#202c33] px-3.5 py-2.5 text-xs font-mono font-bold text-[#25d366] select-none">
                     {selectedCountry.code}
@@ -751,6 +831,125 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
           <PWAInstallButton />
         </div>
       </div>
+
+      {/* Firebase Phone Authentication Setup Modal */}
+      <Modal
+        isOpen={showSetupModal}
+        onClose={() => setShowSetupModal(false)}
+        title="Firebase Phone Provider Activation"
+        subtitle="Follow these 3 quick steps in the Firebase Console"
+        maxWidth="lg"
+      >
+        <div className="space-y-4 text-xs text-[#8696a0]">
+          {/* Step 1 */}
+          <div className="rounded-xl border border-[#222d34] bg-[#202c33] p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[#e9edef] flex items-center gap-1.5">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#25d366] text-slate-950 text-[10px] font-black">
+                  1
+                </span>
+                Enable Phone Provider
+              </span>
+              <a
+                href={FIREBASE_CONSOLE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-[#25d366] hover:underline"
+              >
+                <span>Open Providers</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            <p>
+              In Firebase Console under <strong>Sign-in method</strong>, click on <strong>Phone</strong> and toggle the <strong>Enable</strong> switch to ON, then click <strong>Save</strong>.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="rounded-xl border border-[#222d34] bg-[#202c33] p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[#e9edef] flex items-center gap-1.5">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#25d366] text-slate-950 text-[10px] font-black">
+                  2
+                </span>
+                Add Authorized Domain
+              </span>
+              <a
+                href={FIREBASE_SETTINGS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-[#25d366] hover:underline"
+              >
+                <span>Open Settings</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            <p>
+              Go to <strong>Authentication &gt; Settings &gt; Authorized domains</strong>, click <strong>Add domain</strong>, and paste your current host domain:
+            </p>
+            <div className="flex items-center justify-between rounded-lg bg-[#111b21] p-2 font-mono text-[11px] text-[#e9edef]">
+              <span>{typeof window !== 'undefined' ? window.location.hostname : 'run.app'}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  copyToClipboard(
+                    typeof window !== 'undefined' ? window.location.hostname : 'run.app',
+                    'Domain'
+                  )
+                }
+                className="text-[#25d366] hover:text-white p-1"
+                title="Copy domain"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="rounded-xl border border-[#222d34] bg-[#202c33] p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[#e9edef] flex items-center gap-1.5">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#25d366] text-slate-950 text-[10px] font-black">
+                  3
+                </span>
+                (Optional) Add Phone Numbers for Testing
+              </span>
+            </div>
+            <p>
+              Under "Phone numbers for testing" in the Phone provider settings, you can register test numbers that bypass SMS quota limits and carrier delays:
+            </p>
+            <div className="rounded-lg bg-[#111b21] p-2.5 font-mono text-[11px] space-y-1 text-[#e9edef]">
+              <div className="flex justify-between">
+                <span className="text-[#8696a0]">Test Phone:</span>
+                <span className="font-bold text-[#25d366]">+256 700 123456</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#8696a0]">Verification Code:</span>
+                <span className="font-bold text-[#25d366]">123456</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 flex gap-2">
+            <a
+              href={FIREBASE_CONSOLE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#00a884] py-2.5 text-xs font-semibold text-white hover:bg-[#009374] transition"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span>Go to Firebase Console</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowSetupModal(false)}
+              className="rounded-xl border border-[#222d34] px-4 py-2.5 text-xs font-medium text-[#e9edef] hover:bg-[#202c33] transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
