@@ -1,0 +1,110 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  username: string;
+  photoURL?: string;
+  bio?: string;
+  status?: string;
+  isOnline: boolean;
+  lastSeen: string;
+  createdAt: string;
+  updatedAt: string;
+  showOnlineStatus?: boolean;
+  showLastSeen?: boolean;
+  readReceipts?: boolean;
+  enterToSend?: boolean;
+  theme?: 'dark' | 'light' | 'system';
+  blockedUserIds?: string[];
+  isDisabled?: boolean;
+}
+
+export type ConversationType = 'direct' | 'group';
+
+export interface LastMessageInfo {
+  id: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  timestamp: string;
+  type: 'text' | 'image' | 'file' | 'voice' | 'system';
+}
+
+export interface Conversation {
+  id: string;
+  type: ConversationType;
+  participantIds: string[];
+  name?: string;
+  description?: string;
+  photoURL?: string;
+  adminIds?: string[];
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  pinnedBy?: string[];
+  mutedBy?: string[];
+  archivedBy?: string[];
+  lastMessage?: LastMessageInfo;
+  unreadCounts?: Record<string, number>;
+}
+
+export type MessageType = 'text' | 'image' | 'file' | 'voice' | 'system';
+
+export interface ReplyReference {
+  messageId: string;
+  senderName: string;
+  text: string;
+  type: MessageType;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderPhotoURL?: string;
+  text: string;
+  type: MessageType;
+  createdAt: string;
+  updatedAt?: string;
+  isEdited?: boolean;
+  isDeleted?: boolean;
+  deletedFor?: string[];
+  replyTo?: ReplyReference | null;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
+  audioDuration?: number;
+  reactions?: Record<string, string[]>; // emoji: [uid1, uid2...]
+  readBy?: string[];
+  deliveredTo?: string[];
+}
+
+export interface TypingStatus {
+  userId: string;
+  displayName: string;
+  timestamp: number;
+}
+
+export interface ModerationReport {
+  id: string;
+  reporterId: string;
+  reportedUserId: string;
+  messageId?: string;
+  reason: string;
+  description: string;
+  status: 'pending' | 'resolved' | 'dismissed';
+  createdAt: string;
+}
+
+export interface AdminRole {
+  role: 'admin' | 'moderator';
+  email: string;
+  assignedAt: string;
+}

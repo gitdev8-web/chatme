@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "username": { "type": "string", "maxLength": 50, "pattern": "^[a-z0-9_]{3,30}$" },
+        "photoURL": { "type": "string", "maxLength": 2048 },
+        "bio": { "type": "string", "maxLength": 500 },
+        "isOnline": { "type": "boolean" },
+        "lastSeen": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 },
+        "showOnlineStatus": { "type": "boolean" },
+        "showLastSeen": { "type": "boolean" },
+        "readReceipts": { "type": "boolean" },
+        "blockedUserIds": { "type": "array" }
+      },
+      "required": ["uid", "email", "displayName", "username"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Direct message or group conversation thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["direct", "group"] },
+        "participantIds": { "type": "array" },
+        "name": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "photoURL": { "type": "string", "maxLength": 2048 },
+        "adminIds": { "type": "array" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 },
+        "pinnedBy": { "type": "array" },
+        "mutedBy": { "type": "array" },
+        "archivedBy": { "type": "array" },
+        "lastMessage": { "type": "object" },
+        "unreadCounts": { "type": "object" }
+      },
+      "required": ["id", "type", "participantIds", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Message within a conversation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "conversationId": { "type": "string", "maxLength": 128 },
+        "senderId": { "type": "string", "maxLength": 128 },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "senderPhotoURL": { "type": "string", "maxLength": 2048 },
+        "text": { "type": "string", "maxLength": 5000 },
+        "type": { "type": "string", "enum": ["text", "image", "file", "voice", "system"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 },
+        "isEdited": { "type": "boolean" },
+        "isDeleted": { "type": "boolean" },
+        "deletedFor": { "type": "array" },
+        "replyTo": { "type": "object" },
+        "fileUrl": { "type": "string", "maxLength": 2048 },
+        "fileName": { "type": "string", "maxLength": 255 },
+        "fileSize": { "type": "number" },
+        "fileType": { "type": "string", "maxLength": 100 },
+        "audioDuration": { "type": "number" },
+        "reactions": { "type": "object" },
+        "readBy": { "type": "array" },
+        "deliveredTo": { "type": "array" }
+      },
+      "required": ["id", "conversationId", "senderId", "type", "createdAt"]
+    },
+    "TypingIndicator": {
+      "title": "TypingIndicator",
+      "description": "Ephemeral user typing status in conversation",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "timestamp"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "User or message moderation report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "reporterId": { "type": "string", "maxLength": 128 },
+        "reportedUserId": { "type": "string", "maxLength": 128 },
+        "messageId": { "type": "string", "maxLength": 128 },
+        "reason": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["pending", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "reporterId", "reportedUserId", "reason", "status", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin authorization entry",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["admin", "moderator"] },
+        "email": { "type": "string", "maxLength": 256 },
+        "assignedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["role", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct message and group conversation metadata"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages subcollection per conversation"
+    },
+    "/conversations/{conversationId}/typing/{userId}": {
+      "schema": "TypingIndicator",
+      "description": "Ephemeral typing indicator state"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Moderation reports submitted by users"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Designated administrator records"
+    }
+  }
+}

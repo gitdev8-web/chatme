@@ -1,0 +1,114 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email != null && request.auth.token.email == 'gitdev8@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && incoming().uid == userId;
+      allow update: if (isOwner(userId) && incoming().uid == userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Reports Collection
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && incoming().reporterId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Conversations Collection
+    match /conversations/{conversationId} {
+      allow read: if isSignedIn() && (
+        (resource != null && request.auth.uid in resource.data.participantIds) ||
+        isAdmin()
+      );
+
+      allow create: if isSignedIn() && (
+        request.auth.uid in incoming().participantIds
+      );
+
+      allow update: if isSignedIn() && (
+        (resource != null && request.auth.uid in resource.data.participantIds) ||
+        isAdmin()
+      );
+
+      allow delete: if isSignedIn() && (
+        (resource != null && (
+          (resource.data.type == 'group' && resource.data.createdBy == request.auth.uid) ||
+          (resource.data.type == 'direct' && request.auth.uid in resource.data.participantIds)
+        )) ||
+        isAdmin()
+      );
+
+      // Messages Subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds ||
+          isAdmin()
+        );
+
+        allow create: if isSignedIn() &&
+          incoming().senderId == request.auth.uid &&
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+
+        allow update: if isSignedIn() && (
+          // Sender editing message or marking deleted
+          (resource.data.senderId == request.auth.uid) ||
+          // Participants reacting, adding to readBy, or adding to deliveredTo / deletedFor
+          (request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds) ||
+          isAdmin()
+        );
+
+        allow delete: if isSignedIn() && (
+          resource.data.senderId == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Typing indicators
+      match /typing/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
+      }
+    }
+  }
+}
