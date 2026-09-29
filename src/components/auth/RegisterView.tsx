@@ -15,6 +15,9 @@ import {
   Check,
   Phone,
   Sparkles,
+  Eye,
+  EyeOff,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { uploadFileWithProgress } from '../../services/storageService';
@@ -33,9 +36,12 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 }) => {
   const { registerWithEmail, loginWithGoogle, checkUsernameAvailable, demoPhoneLogin } =
     useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('Hey there! I am using Chattr.');
@@ -50,7 +56,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   >('idle');
 
   const handleUsernameChange = async (val: string) => {
-    const cleaned = val.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 30);
+    const cleaned = val.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     setUsername(cleaned);
 
     if (cleaned.length < 3) {
@@ -76,22 +82,27 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     }
   };
 
+  const handleRemoveAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!displayName.trim()) {
-      setError('Display name is required.');
+      setError('Please enter your full or display name.');
       return;
     }
 
     if (username.length < 3) {
-      setError('Username must be at least 3 characters.');
+      setError('Username must be at least 3 characters long.');
       return;
     }
 
     if (usernameStatus === 'taken') {
-      setError(`Username @${username} is already taken. Pick another.`);
+      setError(`Username @${username} is already taken. Please choose another.`);
       return;
     }
 
@@ -101,7 +112,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('Passwords do not match. Please re-type your password.');
       return;
     }
 
@@ -128,10 +139,10 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Registration failed';
       if (msg.includes('auth/email-already-in-use')) {
-        setError('An account with this email already exists. Try signing in.');
+        setError('An account with this email already exists. Try signing in instead.');
       } else if (msg.includes('auth/unauthorized-domain')) {
         setError(
-          'This domain is not yet authorized in Firebase Console. Please add it under Authentication > Settings > Authorized domains.'
+          'This web domain is not yet authorized in Firebase Console. Add your domain under Authentication > Settings > Authorized domains.'
         );
       } else {
         setError(msg);
@@ -174,30 +185,31 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   };
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-start bg-[#0b141a] px-4 py-8 sm:py-12 relative overflow-y-auto">
+    <div className="min-h-screen w-full flex flex-col items-center justify-start bg-[#0b141a] px-3 sm:px-4 py-8 sm:py-12 overflow-y-auto">
       {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#25d366]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-72 h-72 bg-[#128c7e]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#25d366]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed bottom-10 left-10 w-72 h-72 bg-[#128c7e]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-lg relative z-10 my-auto">
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center mb-2.5">
+          <div className="inline-flex items-center justify-center mb-3">
             <Realistic3DIcon name="whatsapp" size="xl" showDots={true} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#e9edef] flex items-center justify-center gap-1.5">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#e9edef] flex items-center justify-center gap-1.5">
             <span>Create Your</span>
             <span className="text-[#25d366]">Account</span>
           </h1>
           <p className="mt-1 text-xs text-[#8696a0]">
-            Sign up with email to start chatting on Chattr
+            Join Chattr to start chatting immediately with fast, secure messaging
           </p>
         </div>
 
         {/* Register Card */}
-        <div className="rounded-2xl border border-[#222d34] bg-[#111b21] p-5 sm:p-8 backdrop-blur-xl shadow-2xl">
+        <div className="rounded-2xl border border-[#222d34] bg-[#111b21] p-5 sm:p-7 shadow-2xl backdrop-blur-xl">
+          {/* Error Banner */}
           {error && (
-            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-300">
+            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3.5 text-xs text-rose-300">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
@@ -208,19 +220,19 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 py-1.5 font-semibold text-white hover:bg-[#009374] transition"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Try Instant Demo Login</span>
+                <span>Try Instant 1-Click Demo Login</span>
               </button>
             </div>
           )}
 
-          {/* Quick Google Sign Up option */}
+          {/* Quick Google Sign Up button */}
           <button
             type="button"
             onClick={handleGoogleSignUp}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-[#222d34] bg-[#202c33] py-2.5 text-xs font-medium text-[#e9edef] hover:bg-[#2a3942] disabled:opacity-50 transition mb-4 shadow-sm"
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-[#222d34] bg-[#202c33] py-2.5 px-4 text-xs font-medium text-[#e9edef] hover:bg-[#2a3942] disabled:opacity-50 transition mb-4 shadow-sm"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -241,24 +253,27 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
             <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
           </button>
 
+          {/* Divider */}
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-[#222d34]" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-[#111b21] px-3 text-[#8696a0] tracking-wider">or sign up with email</span>
+              <span className="bg-[#111b21] px-3 text-[#8696a0] tracking-wider font-semibold">
+                or sign up with email
+              </span>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Avatar Selector */}
-            <div className="flex flex-col items-center justify-center mb-1">
-              <div className="relative group cursor-pointer">
+            <div className="flex flex-col items-center justify-center pt-1 pb-2">
+              <div className="relative group">
                 <Avatar
                   src={avatarPreview}
                   name={displayName || 'User'}
                   size="xl"
-                  className="ring-2 ring-[#25d366]/40"
+                  className="ring-2 ring-[#25d366]/40 cursor-pointer shadow-md"
                 />
                 <label className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                   <Camera className="h-5 w-5 text-white" />
@@ -269,25 +284,45 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                     className="hidden"
                   />
                 </label>
+                {avatarPreview && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg hover:bg-rose-500 transition"
+                    title="Remove photo"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
-              <span className="text-[11px] text-[#8696a0] mt-1.5">Tap avatar to upload photo</span>
+              <label className="text-[11px] text-[#25d366] hover:underline cursor-pointer mt-1.5 font-medium">
+                <span>{avatarPreview ? 'Change photo' : 'Upload photo (optional)'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarFile}
+                  className="hidden"
+                />
+              </label>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Row 1: Display Name & Username */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* Display Name */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                  Display Name
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                  Display Name <span className="text-rose-400">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                   <input
                     type="text"
                     required
+                    autoComplete="name"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Alex Morgan"
-                    className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+                    placeholder="e.g. Alex Morgan"
+                    className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-3.5 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
                   />
                 </div>
               </div>
@@ -295,27 +330,31 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               {/* Username */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                    Username (@handle)
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                    Username <span className="text-rose-400">*</span>
                   </label>
                   {usernameStatus === 'available' && (
-                    <span className="text-[10px] text-[#25d366] flex items-center gap-0.5">
+                    <span className="text-[10px] text-[#25d366] font-semibold flex items-center gap-0.5">
                       <Check className="h-3 w-3" /> Available
                     </span>
                   )}
                   {usernameStatus === 'taken' && (
-                    <span className="text-[10px] text-rose-400">Taken</span>
+                    <span className="text-[10px] text-rose-400 font-semibold">Taken</span>
+                  )}
+                  {usernameStatus === 'checking' && (
+                    <span className="text-[10px] text-[#8696a0]">Checking...</span>
                   )}
                 </div>
                 <div className="relative">
-                  <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+                  <AtSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                   <input
                     type="text"
                     required
+                    autoComplete="username"
                     value={username}
                     onChange={(e) => handleUsernameChange(e.target.value)}
                     placeholder="alexmorgan"
-                    className={`w-full rounded-xl border bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 transition ${
+                    className={`w-full rounded-xl border bg-[#202c33] pl-10 pr-3.5 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 transition ${
                       usernameStatus === 'available'
                         ? 'border-[#25d366] focus:border-[#25d366] focus:ring-[#25d366]'
                         : usernameStatus === 'taken'
@@ -327,66 +366,101 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               </div>
             </div>
 
-            {/* Email */}
+            {/* Row 2: Email Address */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                Email Address
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                Email Address <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="alex@domain.com"
-                  className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+                  className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-3.5 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Row 3: Password & Confirm Password */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* Password */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                  Password
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                  Password <span className="text-rose-400">*</span>
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min. 6 chars"
-                    className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+                    placeholder="Min. 6 characters"
+                    className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-10 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-[#e9edef] p-1"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
               {/* Confirm Password */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                  Confirm Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                    Confirm Password <span className="text-rose-400">*</span>
+                  </label>
+                  {confirmPassword && password === confirmPassword && (
+                    <span className="text-[10px] text-[#25d366] font-semibold flex items-center gap-0.5">
+                      <Check className="h-3 w-3" /> Matched
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     required
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter password"
-                    className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+                    placeholder="Re-type password"
+                    className={`w-full rounded-xl border bg-[#202c33] pl-10 pr-10 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 transition ${
+                      confirmPassword && password !== confirmPassword
+                        ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
+                        : 'border-[#222d34] focus:border-[#25d366] focus:ring-[#25d366]'
+                    }`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-[#e9edef] p-1"
+                    title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Bio */}
+            {/* Row 4: Bio / About */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                Bio / About (Optional)
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
+                About / Bio (Optional)
               </label>
               <input
                 type="text"
@@ -394,14 +468,15 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={140}
                 placeholder="Hey there! I am using Chattr."
-                className="w-full rounded-xl border border-[#222d34] bg-[#202c33] px-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+                className="w-full rounded-xl border border-[#222d34] bg-[#202c33] px-3.5 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
               />
             </div>
 
+            {/* Create Account Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 text-xs font-semibold text-white shadow-md hover:bg-[#009374] disabled:opacity-50 transition"
+              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-3 text-xs font-semibold text-white shadow-lg hover:bg-[#009374] disabled:opacity-50 transition cursor-pointer active:scale-[0.99]"
             >
               {loading ? (
                 <span>Creating your account...</span>
@@ -414,9 +489,20 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
             </button>
           </form>
 
+          {/* Quick Demo Login Option */}
+          <button
+            type="button"
+            onClick={handleInstantDemo}
+            disabled={loading}
+            className="w-full mt-2.5 flex items-center justify-center gap-2 rounded-xl border border-[#25d366]/40 bg-[#005c4b]/30 py-2.5 text-xs font-semibold text-[#25d366] hover:bg-[#005c4b]/50 transition"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>Instant 1-Click Demo Login</span>
+          </button>
+
           {/* Switch to Phone Auth */}
           {onSwitchToPhone && (
-            <div className="mt-4 text-center">
+            <div className="mt-3.5 text-center">
               <button
                 type="button"
                 onClick={onSwitchToPhone}
@@ -428,17 +514,20 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
             </div>
           )}
 
-          <div className="mt-4 text-center text-xs text-[#8696a0]">
+          {/* Switch to Sign In */}
+          <div className="mt-4 pt-3 border-t border-[#222d34] text-center text-xs text-[#8696a0]">
             Already have an account?{' '}
             <button
+              type="button"
               onClick={onSwitchToLogin}
-              className="font-medium text-[#25d366] hover:underline transition"
+              className="font-bold text-[#25d366] hover:underline transition cursor-pointer"
             >
               Sign In
             </button>
           </div>
         </div>
 
+        {/* PWA Install */}
         <div className="mt-5 flex justify-center">
           <PWAInstallButton />
         </div>

@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Phone,
   Sparkles,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Modal } from '../common/Modal';
@@ -30,6 +32,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const { loginWithEmail, loginWithGoogle, resetPassword, demoPhoneLogin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -118,18 +121,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
   };
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-start bg-[#0b141a] px-4 py-8 sm:py-12 relative overflow-y-auto">
+    <div className="min-h-screen w-full flex flex-col items-center justify-start bg-[#0b141a] px-3 sm:px-4 py-8 sm:py-12 overflow-y-auto">
       {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#25d366]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-[#128c7e]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#25d366]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed bottom-10 right-10 w-72 h-72 bg-[#128c7e]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10 my-auto">
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center mb-2.5">
+          <div className="inline-flex items-center justify-center mb-3">
             <Realistic3DIcon name="whatsapp" size="xl" showDots={true} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#e9edef] flex items-center justify-center gap-1.5">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#e9edef] flex items-center justify-center gap-1.5">
             <span>Welcome to</span>
             <span className="text-[#25d366]">Chattr</span>
           </h1>
@@ -139,9 +142,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </div>
 
         {/* Login Card */}
-        <div className="rounded-2xl border border-[#222d34] bg-[#111b21] p-5 sm:p-8 backdrop-blur-xl shadow-2xl">
+        <div className="rounded-2xl border border-[#222d34] bg-[#111b21] p-5 sm:p-7 shadow-2xl backdrop-blur-xl">
           {error && (
-            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-300">
+            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3.5 text-xs text-rose-300">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
@@ -152,14 +155,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 py-1.5 font-semibold text-white hover:bg-[#009374] transition"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Try Instant Demo Login</span>
+                <span>Try Instant 1-Click Demo Login</span>
               </button>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
                 Email Address
               </label>
               <div className="relative">
@@ -167,6 +170,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
@@ -177,7 +181,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0] block">
                   Password
                 </label>
                 <button
@@ -191,13 +195,22 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-4 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+                  className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-10 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-[#e9edef] p-1"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
@@ -216,7 +229,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 text-xs font-semibold text-white shadow-md hover:bg-[#009374] disabled:opacity-50 transition"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-3 text-xs font-semibold text-white shadow-lg hover:bg-[#009374] disabled:opacity-50 transition cursor-pointer active:scale-[0.99]"
             >
               {loading ? (
                 <span>Signing in...</span>
@@ -236,7 +249,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             disabled={loading}
             className="w-full mt-2.5 flex items-center justify-center gap-2 rounded-xl border border-[#25d366]/40 bg-[#005c4b]/30 py-2.5 text-xs font-semibold text-[#25d366] hover:bg-[#005c4b]/50 transition"
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-3.5 w-3.5" />
             <span>Instant 1-Click Demo Login</span>
           </button>
 
@@ -246,7 +259,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <div className="w-full border-t border-[#222d34]" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-[#111b21] px-3 text-[#8696a0] tracking-wider">
+              <span className="bg-[#111b21] px-3 text-[#8696a0] tracking-wider font-semibold">
                 or continue with
               </span>
             </div>
@@ -257,9 +270,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-[#222d34] bg-[#202c33] py-2.5 text-xs font-medium text-[#e9edef] hover:bg-[#2a3942] transition"
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-[#222d34] bg-[#202c33] py-2.5 px-4 text-xs font-medium text-[#e9edef] hover:bg-[#2a3942] transition shadow-sm"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -277,7 +290,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{googleLoading ? 'Connecting...' : 'Sign in with Google'}</span>
+            <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
           </button>
 
           {/* Switch to Phone Auth */}
@@ -295,11 +308,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
           )}
 
           {/* Switch to Register */}
-          <div className="mt-4 text-center text-xs text-[#8696a0]">
+          <div className="mt-4 pt-3 border-t border-[#222d34] text-center text-xs text-[#8696a0]">
             Don't have a Chattr account?{' '}
             <button
+              type="button"
               onClick={onSwitchToRegister}
-              className="font-medium text-[#25d366] hover:underline transition"
+              className="font-bold text-[#25d366] hover:underline transition cursor-pointer"
             >
               Sign Up
             </button>
@@ -330,6 +344,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 placeholder="name@example.com"
