@@ -4,10 +4,19 @@
  */
 
 import React, { useState } from 'react';
-import { Mail, Lock, LogIn, Sparkles, AlertCircle } from 'lucide-react';
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  AlertCircle,
+  Phone,
+  Sparkles,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { ForgotPasswordModal } from './ForgotPasswordModal';
+import { Modal } from '../common/Modal';
+import { useToast } from '../common/Toast';
 import { PWAInstallButton } from '../common/PWAInstallButton';
+import { Realistic3DIcon } from '../common/Realistic3DIcon';
 
 interface LoginViewProps {
   onSwitchToRegister: () => void;
@@ -18,37 +27,41 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onSwitchToRegister,
   onSwitchToPhone,
 }) => {
-  const { loginWithEmail, loginWithGoogle } = useAuth();
+  const { loginWithEmail, loginWithGoogle, resetPassword, demoPhoneLogin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Forgot password
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setError('Please fill in both email and password.');
-      return;
-    }
     setError(null);
     setLoading(true);
+
     try {
       await loginWithEmail(email.trim(), password);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Invalid credentials';
-      if (msg.includes('auth/operation-not-allowed')) {
+      const msg = err instanceof Error ? err.message : 'Failed to sign in';
+      if (
+        msg.includes('auth/invalid-credential') ||
+        msg.includes('auth/user-not-found') ||
+        msg.includes('auth/wrong-password')
+      ) {
+        setError('Incorrect email or password. Please verify your credentials.');
+      } else if (msg.includes('auth/unauthorized-domain')) {
         setError(
-          'Email/Password sign-in is disabled in your Firebase project. Please use "Sign in with Google" below.'
+          'This domain is not yet authorized in Firebase Console. Add your domain in Firebase Authentication > Settings > Authorized domains.'
         );
       } else {
-        setError(
-          msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password')
-            ? 'Invalid email or password combination. Try again or reset password.'
-            : msg
-        );
+        setError(msg);
       }
     } finally {
       setLoading(false);
@@ -62,116 +75,180 @@ export const LoginView: React.FC<LoginViewProps> = ({
       await loginWithGoogle();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google sign-in cancelled or failed';
-      setError(msg);
+      if (msg.includes('auth/unauthorized-domain')) {
+        setError(
+          'This domain is not yet authorized in Firebase Console. Add your domain in Firebase Authentication > Settings > Authorized domains.'
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setGoogleLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 px-4 py-8 relative overflow-hidden select-none">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+  const handleInstantDemo = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await demoPhoneLogin('+256700123456', 'Chattr Member');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Demo login failed';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <div className="w-full max-w-md relative z-10">
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+    setResetLoading(true);
+    try {
+      await resetPassword(resetEmail.trim());
+      showToast('Password reset link sent to your email!', 'success');
+      setShowForgotModal(false);
+      setResetEmail('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send reset link';
+      showToast(msg, 'error');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-start bg-[#0b141a] px-4 py-8 sm:py-12 relative overflow-y-auto">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#25d366]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-72 h-72 bg-[#128c7e]/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10 my-auto">
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 border border-slate-700/80 shadow-2xl mb-3.5 ring-1 ring-emerald-500/20">
-            <img src="/icon.svg" alt="Chattr" className="w-10 h-10 object-contain" />
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center mb-2.5">
+            <Realistic3DIcon name="whatsapp" size="xl" showDots={true} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
-            Welcome to <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Chattr</span>
+          <h1 className="text-2xl font-bold tracking-tight text-[#e9edef] flex items-center justify-center gap-1.5">
+            <span>Welcome to</span>
+            <span className="text-[#25d366]">Chattr</span>
           </h1>
-          <p className="mt-1.5 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-[#8696a0]">
             Fast, secure, real-time messaging across all devices
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="rounded-2xl border border-slate-800/90 bg-slate-900/80 p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+        <div className="rounded-2xl border border-[#222d34] bg-[#111b21] p-5 sm:p-8 backdrop-blur-xl shadow-2xl">
           {error && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-300 animate-in fade-in">
-              <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="mb-5 flex flex-col gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-300">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleInstantDemo}
+                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 py-1.5 font-semibold text-white hover:bg-[#009374] transition"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Try Instant Demo Login</span>
+              </button>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Email Address</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
+                Email Address
+              </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
-                  className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                  className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-4 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-slate-300">Password</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
+                  Password
+                </label>
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(true)}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 transition"
+                  className="text-xs text-[#25d366] hover:underline transition"
                 >
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                  className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-4 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
                 />
               </div>
             </div>
 
-            <div className="flex items-center">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-emerald-500/20"
+                  className="h-3.5 w-3.5 rounded border-[#222d34] bg-[#202c33] text-[#25d366] focus:ring-[#25d366]/20"
                 />
-                <span className="text-xs text-slate-400">Remember this device</span>
+                <span className="text-xs text-[#8696a0]">Remember this device</span>
               </label>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-950/40 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 transition"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 text-xs font-semibold text-white shadow-md hover:bg-[#009374] disabled:opacity-50 transition"
             >
               {loading ? (
                 <span>Signing in...</span>
               ) : (
                 <>
-                  <LogIn className="h-4 w-4" />
-                  <span>Sign In</span>
+                  <span>Sign In with Email</span>
+                  <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
+          {/* Quick 1-Click Demo Login */}
+          <button
+            type="button"
+            onClick={handleInstantDemo}
+            disabled={loading}
+            className="w-full mt-2.5 flex items-center justify-center gap-2 rounded-xl border border-[#25d366]/40 bg-[#005c4b]/30 py-2.5 text-xs font-semibold text-[#25d366] hover:bg-[#005c4b]/50 transition"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>Instant 1-Click Demo Login</span>
+          </button>
+
+          {/* Social Sign-in Divider */}
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-800" />
+              <div className="w-full border-t border-[#222d34]" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-slate-900 px-3 text-slate-500 tracking-wider">or continue with</span>
+              <span className="bg-[#111b21] px-3 text-[#8696a0] tracking-wider">
+                or continue with
+              </span>
             </div>
           </div>
 
@@ -180,7 +257,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-800/70 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white disabled:opacity-50 transition"
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-[#222d34] bg-[#202c33] py-2.5 text-xs font-medium text-[#e9edef] hover:bg-[#2a3942] transition"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -200,45 +277,84 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Sign in with Google</span>
+            <span>{googleLoading ? 'Connecting...' : 'Sign in with Google'}</span>
           </button>
 
           {/* Switch to Phone Auth */}
           {onSwitchToPhone && (
-            <div className="mt-4 text-center">
+            <div className="mt-3.5 text-center">
               <button
                 type="button"
                 onClick={onSwitchToPhone}
-                className="text-xs font-semibold text-[#25d366] hover:underline transition"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#25d366] hover:underline transition"
               >
-                📱 Sign in with Phone Number
+                <Phone className="h-3.5 w-3.5" />
+                <span>Or sign in with Phone Number</span>
               </button>
             </div>
           )}
 
           {/* Switch to Register */}
-          <div className="mt-4 text-center text-xs text-slate-400">
+          <div className="mt-4 text-center text-xs text-[#8696a0]">
             Don't have a Chattr account?{' '}
             <button
               onClick={onSwitchToRegister}
-              className="font-medium text-emerald-400 hover:text-emerald-300 transition"
+              className="font-medium text-[#25d366] hover:underline transition"
             >
-              Create Account
+              Sign Up
             </button>
           </div>
         </div>
 
-        {/* In-app install banner helper */}
+        {/* Footer PWA Install */}
         <div className="mt-5 flex justify-center">
           <PWAInstallButton />
         </div>
       </div>
 
-      <ForgotPasswordModal
+      {/* Forgot Password Modal */}
+      <Modal
         isOpen={showForgotModal}
         onClose={() => setShowForgotModal(false)}
-        defaultEmail={email}
-      />
+        title="Reset Password"
+        subtitle="Enter your email to receive recovery instructions"
+        maxWidth="sm"
+      >
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-[#8696a0]">
+              Registered Email
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
+              <input
+                type="email"
+                required
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="name@example.com"
+                className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="flex-1 rounded-xl border border-[#222d34] py-2 text-xs font-medium text-[#8696a0] hover:bg-[#202c33] hover:text-[#e9edef] transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={resetLoading}
+              className="flex-1 rounded-xl bg-[#00a884] py-2 text-xs font-semibold text-white hover:bg-[#009374] disabled:opacity-50 transition"
+            >
+              {resetLoading ? 'Sending...' : 'Send Link'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

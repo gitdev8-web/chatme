@@ -198,23 +198,37 @@ const MainChatDashboard: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { user, profile, loading } = useAuth();
-  const [authView, setAuthView] = useState<'phone' | 'email-login' | 'email-register'>(
+  const [authView, setAuthView] = useState<'email-login' | 'email-register' | 'phone'>(
     typeof window !== 'undefined' && window.location.pathname === '/register'
       ? 'email-register'
-      : typeof window !== 'undefined' && window.location.pathname === '/login'
-      ? 'email-login'
-      : 'phone'
+      : typeof window !== 'undefined' && window.location.pathname === '/phone'
+      ? 'phone'
+      : 'email-login'
   );
 
   React.useEffect(() => {
     if (!user && !loading) {
       if (window.location.pathname === '/register') {
         setAuthView('email-register');
+      } else if (window.location.pathname === '/phone') {
+        setAuthView('phone');
       } else if (window.location.pathname === '/login') {
         setAuthView('email-login');
       }
     }
   }, [user, loading]);
+
+  React.useEffect(() => {
+    if (!user && !loading) {
+      if (authView === 'email-register') {
+        window.history.replaceState(null, '', '/register');
+      } else if (authView === 'phone') {
+        window.history.replaceState(null, '', '/phone');
+      } else {
+        window.history.replaceState(null, '', '/login');
+      }
+    }
+  }, [authView, user, loading]);
 
   if (loading) {
     return (
@@ -231,16 +245,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Not authenticated: default to PhoneAuthView
+  // Not authenticated: default to Email LoginView
   if (!user) {
-    if (authView === 'email-login') {
-      return (
-        <LoginView
-          onSwitchToRegister={() => setAuthView('email-register')}
-          onSwitchToPhone={() => setAuthView('phone')}
-        />
-      );
-    }
     if (authView === 'email-register') {
       return (
         <RegisterView
@@ -249,7 +255,15 @@ const AppContent: React.FC = () => {
         />
       );
     }
-    return <PhoneAuthView onSwitchToEmail={() => setAuthView('email-login')} />;
+    if (authView === 'phone') {
+      return <PhoneAuthView onSwitchToEmail={() => setAuthView('email-login')} />;
+    }
+    return (
+      <LoginView
+        onSwitchToRegister={() => setAuthView('email-register')}
+        onSwitchToPhone={() => setAuthView('phone')}
+      />
+    );
   }
 
   // Authenticated via phone or Google, but profile setup pending
