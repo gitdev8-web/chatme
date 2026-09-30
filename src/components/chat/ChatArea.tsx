@@ -29,6 +29,7 @@ import { MessagesSkeleton } from '../common/LoadingSkeleton';
 import { ForwardModal } from './ForwardModal';
 import { CallModal } from '../calls/CallModal';
 import { initiateCall } from '../../services/callService';
+import { useToast } from '../common/Toast';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -40,7 +41,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onToggleDetails,
 }) => {
   const { user, profile } = useAuth();
+  const { showToast } = useToast();
   const {
+    activeConversationId,
     activeConversation,
     messages,
     typingUsers,
@@ -78,7 +81,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const isDirect = activeConversation?.type === 'direct';
   const partnerId = isDirect
-    ? activeConversation?.participantIds?.find((id) => id !== user?.uid) || user?.uid
+    ? (activeConversation?.participantIds?.find((id) => id !== user?.uid) ||
+       (activeConversation?.id?.startsWith('dm_')
+         ? activeConversation.id.replace('dm_', '').split('_').find((id) => id !== user?.uid)
+         : null))
     : null;
   const partnerProfile = partnerId ? userCache[partnerId] : null;
 
@@ -154,23 +160,34 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleStartCall = async (type: 'audio' | 'video') => {
+    if (!user) return;
     setCallType(type);
-    if (user && isDirect && partnerId) {
-      try {
-        const cid = await initiateCall(
-          user.uid,
-          profile?.displayName || user.displayName || 'DEV CHAT User',
-          profile?.photoURL || user.photoURL || '',
-          partnerId,
-          partnerProfile?.displayName || 'Contact',
-          type
-        );
-        setActiveCallSessionId(cid);
-      } catch (err) {
-        console.warn('Call initiation warning:', err);
-      }
+
+    let targetUid = partnerId;
+    if ((!targetUid || targetUid === user.uid) && activeConversation?.id?.startsWith('dm_')) {
+      targetUid = activeConversation.id.replace('dm_', '').split('_').find((id) => id !== user.uid) || null;
     }
-    setIsCallOpen(true);
+
+    if (!targetUid || targetUid === user.uid) {
+      showToast('Cannot call: no recipient contact found', 'error');
+      return;
+    }
+
+    try {
+      const cid = await initiateCall(
+        user.uid,
+        profile?.displayName || user.displayName || 'DEV CHAT User',
+        profile?.photoURL || user.photoURL || '',
+        targetUid,
+        partnerProfile?.displayName || 'Contact',
+        type
+      );
+      setActiveCallSessionId(cid);
+      setIsCallOpen(true);
+    } catch (err) {
+      console.warn('Call initiation warning:', err);
+      showToast('Could not start call. Please try again.', 'error');
+    }
   };
 
   // Typing indicator text
@@ -185,7 +202,34 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return 'Several people are typing...';
   };
 
-  // WhatsApp Web Welcome Splash Screen
+  // Loading state when a conversation ID is selected but data is being synced
+  if (activeConversationId && !activeConversation) {
+    return (
+      <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
+        <div className="flex h-16 items-center border-b border-[#222d34] bg-[#202c33] px-3 sm:px-4 py-2 z-10 shadow-sm flex-shrink-0">
+          <button
+            onClick={onBackMobile}
+            className="md:hidden rounded-full p-2 -ml-1 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition active:scale-95 flex-shrink-0 mr-2"
+            title="Back to chats"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-[#2a3942] animate-pulse flex-shrink-0" />
+            <div className="space-y-1.5">
+              <div className="h-3.5 w-28 rounded bg-[#2a3942] animate-pulse" />
+              <div className="h-2.5 w-16 rounded bg-[#2a3942]/70 animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 whatsapp-chat-bg">
+          <MessagesSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  // WhatsApp Web Welcome Splash Screen (desktop only when no conversation is selected)
   if (!activeConversation) {
     return (
       <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#222e35] p-8 select-none text-center relative border-b-6 border-[#00a884]">
@@ -201,24 +245,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
 
           <h2 className="text-2xl font-light text-[#e9edef] tracking-wide">
-            Download DEV CHAT for Windows
+            DEV CHAT Web
           </h2>
           <p className="mt-3 text-sm text-[#8696a0] leading-relaxed">
-            Make calls, share your screen and get a faster experience when you download the Windows or Web app.
+            Send and receive messages, make real-time audio and video calls, and share status stories across all your devices.
           </p>
-
-          <button
-            onClick={() => {}}
-            className="mt-6 rounded-full bg-[#00a884] px-6 py-2.5 text-xs font-semibold text-[#111b21] hover:bg-[#06cf9c] transition shadow-lg"
-          >
-            Get DEV CHAT Web
-          </button>
         </div>
 
         {/* Bottom Lock End-to-end Encrypted */}
         <div className="mt-auto pb-4 flex items-center gap-1.5 text-xs text-[#8696a0]">
           <Lock className="h-3.5 w-3.5" />
-          <span>Your personal messages are end-to-end encrypted</span>
+          <span>Your personal messages and calls are end-to-end encrypted</span>
         </div>
       </div>
     );
@@ -227,12 +264,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
       {/* Top Header - Authentic WhatsApp Web Header */}
-      <div className="flex h-15 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-3.5 min-w-0">
+      <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3 sm:px-4 py-2 z-10 shadow-sm flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Mobile Back Button */}
           <button
             onClick={onBackMobile}
-            className="md:hidden rounded-full p-1 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+            className="md:hidden rounded-full p-2 -ml-1 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition active:scale-95 flex-shrink-0"
+            title="Back to chats"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>

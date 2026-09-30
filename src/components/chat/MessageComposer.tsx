@@ -124,19 +124,23 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const handleSendVoiceNote = async () => {
-    if (voiceRecorder.audioBlob) {
-      await onSendFileMessage(
-        voiceRecorder.audioBlob,
-        'voice',
-        `voice_${Date.now()}.webm`,
-        voiceRecorder.recordingDuration
-      );
-      voiceRecorder.cancelRecording();
+    try {
+      const res = await voiceRecorder.stopRecordingAndGetBlob();
+      if (res && res.blob) {
+        await onSendFileMessage(
+          res.blob,
+          'voice',
+          `voice_${Date.now()}.webm`,
+          res.duration
+        );
+      }
+    } catch (err) {
+      console.error('Failed to send voice note:', err);
     }
   };
 
   return (
-    <div className="relative border-t border-[#222d34] bg-[#202c33] px-3.5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] select-none">
+    <div className="relative border-t border-[#222d34] bg-[#202c33] px-2.5 sm:px-3.5 pt-2 sm:pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] select-none flex-shrink-0 z-20">
       {/* Upload Progress Bar */}
       {uploadProgress !== null && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-[#111b21] overflow-hidden z-20">
@@ -172,9 +176,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       {voiceRecorder.isRecording ? (
         <VoiceRecorderComponent
           recorderState={voiceRecorder}
-          onStop={voiceRecorder.stopRecording}
           onCancel={voiceRecorder.cancelRecording}
-          onSend={handleSendVoiceNote}
+          onStopAndSend={handleSendVoiceNote}
         />
       ) : (
         <div className="flex items-end gap-2">
@@ -283,7 +286,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="w-full resize-none rounded-2xl border-none bg-[#2a3942] px-4 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none transition max-h-32"
+              className="w-full resize-none rounded-2xl border-none bg-[#2a3942] px-3.5 sm:px-4 py-2 sm:py-2.5 text-[15px] sm:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none transition max-h-32"
             />
           </div>
 

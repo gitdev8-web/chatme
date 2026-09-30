@@ -25,6 +25,7 @@ import {
 import { Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { useToast } from '../common/Toast';
+import { VoiceNotePlayer } from './VoiceNotePlayer';
 
 interface MessageBubbleProps {
   message: Message;
@@ -59,9 +60,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const { showToast } = useToast();
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [audioProgress, setAudioProgress] = useState(0);
-  const [audioSpeedIndex, setAudioSpeedIndex] = useState(0);
   const [isStarred, setIsStarred] = useState(false);
 
   // System message styling
@@ -92,29 +90,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       showToast('Message copied to clipboard', 'info');
     }
     setShowActions(false);
-  };
-
-  const toggleAudio = (url?: string) => {
-    if (!url) return;
-    const audioEl = document.getElementById(`audio_${message.id}`) as HTMLAudioElement;
-    if (audioEl) {
-      if (isPlayingAudio) {
-        audioEl.pause();
-        setIsPlayingAudio(false);
-      } else {
-        audioEl.play();
-        setIsPlayingAudio(true);
-      }
-    }
-  };
-
-  const cyclePlaybackSpeed = () => {
-    const nextIdx = (audioSpeedIndex + 1) % PLAYBACK_SPEEDS.length;
-    setAudioSpeedIndex(nextIdx);
-    const audioEl = document.getElementById(`audio_${message.id}`) as HTMLAudioElement;
-    if (audioEl) {
-      audioEl.playbackRate = PLAYBACK_SPEEDS[nextIdx];
-    }
   };
 
   // Reactions summary
@@ -337,55 +312,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </div>
               )}
 
-              {/* Voice Note with WhatsApp Audio Player */}
+              {/* Voice Note with Realistic WhatsApp Waveform Audio Player */}
               {message.type === 'voice' && message.fileUrl && (
-                <div className="flex items-center gap-3 py-1 min-w-[220px]">
-                  <button
-                    onClick={() => toggleAudio(message.fileUrl)}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-md hover:bg-[#009374] transition"
-                  >
-                    {isPlayingAudio ? (
-                      <Pause className="h-4 w-4 fill-current" />
-                    ) : (
-                      <Play className="h-4 w-4 fill-current ml-0.5" />
-                    )}
-                  </button>
-
-                  <audio
-                    id={`audio_${message.id}`}
-                    src={message.fileUrl}
-                    onEnded={() => setIsPlayingAudio(false)}
-                    onTimeUpdate={(e) => {
-                      const audio = e.currentTarget;
-                      if (audio.duration) {
-                        setAudioProgress((audio.currentTime / audio.duration) * 100);
-                      }
-                    }}
-                    className="hidden"
-                  />
-
-                  {/* Waveform Scrubber */}
-                  <div className="flex-1 space-y-1">
-                    <div className="h-1.5 w-full rounded-full bg-black/30 overflow-hidden cursor-pointer">
-                      <div
-                        className="h-full bg-[#00a884] transition-all"
-                        style={{ width: `${audioProgress}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-[#8696a0] font-mono">
-                      <span>
-                        {message.audioDuration ? `${message.audioDuration}s` : 'Voice note'}
-                      </span>
-                      {/* Playback speed toggle */}
-                      <button
-                        onClick={cyclePlaybackSpeed}
-                        className="rounded bg-[#111b21] px-1 py-0.2 font-sans font-semibold text-[#00a884] hover:bg-[#202c33]"
-                      >
-                        {PLAYBACK_SPEEDS[audioSpeedIndex]}x
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <VoiceNotePlayer
+                  messageId={message.id}
+                  audioUrl={message.fileUrl}
+                  duration={message.audioDuration}
+                  isSelf={isSelf}
+                  senderName={senderName}
+                  senderPhoto={message.senderPhotoURL || senderProfile?.photoURL}
+                />
               )}
 
               {/* Standard Text Message */}

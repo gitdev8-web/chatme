@@ -45,6 +45,9 @@ service cloud.firestore {
     // Voice & Video Calls Signaling
     match /calls/{callId} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
 
     // Conversations Collection

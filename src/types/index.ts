@@ -138,4 +138,8 @@ export interface CallSession {
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
+  offer?: { type: string; sdp: string };
+  answer?: { type: string; sdp: string };
+  callerIce?: string[];
+  receiverIce?: string[];
 }

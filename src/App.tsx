@@ -26,6 +26,7 @@ import { Realistic3DIcon } from './components/common/Realistic3DIcon';
 import { IncomingCallModal } from './components/calls/IncomingCallModal';
 import { CallModal } from './components/calls/CallModal';
 import { subscribeToIncomingCalls } from './services/callService';
+import { subscribeToStatusStories } from './services/statusService';
 import { CallSession } from './types';
 
 const MainChatDashboard: React.FC = () => {
@@ -54,6 +55,7 @@ const MainChatDashboard: React.FC = () => {
   // Real-time call states
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
   const [activeCallSession, setActiveCallSession] = useState<CallSession | null>(null);
+  const [hasUnreadStatus, setHasUnreadStatus] = useState(false);
 
   // Subscribe to real-time incoming calls
   React.useEffect(() => {
@@ -66,6 +68,18 @@ const MainChatDashboard: React.FC = () => {
       setIncomingCall(call);
     });
 
+    return () => unsub();
+  }, [user]);
+
+  // Subscribe to real-time status updates for unread dot
+  React.useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeToStatusStories((stories) => {
+      const hasUnread = stories.some(
+        (s) => s.userId !== user.uid && !s.viewedBy?.includes(user.uid)
+      );
+      setHasUnreadStatus(hasUnread);
+    });
     return () => unsub();
   }, [user]);
 
@@ -170,6 +184,7 @@ const MainChatDashboard: React.FC = () => {
           activeTab={activeBottomTab}
           onTabChange={handleBottomTabChange}
           unreadCount={totalUnread}
+          hasUnreadStatus={hasUnreadStatus}
         />
       )}
 

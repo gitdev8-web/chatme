@@ -12,6 +12,7 @@ import {
   query,
   where,
   onSnapshot,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
@@ -75,6 +76,8 @@ export function subscribeToIncomingCalls(
   currentUid: string,
   onIncomingCall: (session: CallSession | null) => void
 ): () => void {
+  if (!currentUid) return () => {};
+
   const callsRef = collection(db, 'calls');
   const q = query(
     callsRef,
@@ -86,15 +89,26 @@ export function subscribeToIncomingCalls(
     q,
     (snap) => {
       if (!snap.empty) {
-        // Return most recent ringing call
-        const docs = snap.docs.map((d) => d.data() as CallSession);
-        docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        onIncomingCall(docs[0]);
-      } else {
-        onIncomingCall(null);
+        const now = Date.now();
+        // Return most recent ringing call created within 60 seconds
+        const docs = snap.docs
+          .map((d) => ({ ...d.data(), id: d.id } as CallSession))
+          .filter((c) => {
+            if (c.status !== 'ringing') return false;
+            const created = new Date(c.createdAt || 0).getTime();
+            return now - created < 60000;
+          });
+
+        if (docs.length > 0) {
+          docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          onIncomingCall(docs[0]);
+          return;
+        }
       }
+      onIncomingCall(null);
     },
-    () => {
+    (err) => {
+      console.warn('Incoming call listener note:', err);
       onIncomingCall(null);
     }
   );
@@ -135,3 +149,48 @@ export async function endCall(callId: string): Promise<void> {
     handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}`);
   }
 }
+
+export async function setCallOffer(
+  callId: string,
+  offer: { type: string; sdp: string }
+): Promise<void> {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    await updateDoc(callRef, {
+      offer,
+    });
+  } catch (err) {
+    console.warn('Failed to set call offer:', err);
+  }
+}
+
+export async function setCallAnswer(
+  callId: string,
+  answer: { type: string; sdp: string }
+): Promise<void> {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    await updateDoc(callRef, {
+      answer,
+    });
+  } catch (err) {
+    console.warn('Failed to set call answer:', err);
+  }
+}
+
+export async function addCallIceCandidate(
+  callId: string,
+  candidate: RTCIceCandidateInit,
+  role: 'caller' | 'receiver'
+): Promise<void> {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    const field = role === 'caller' ? 'callerIce' : 'receiverIce';
+    await updateDoc(callRef, {
+      [field]: arrayUnion(JSON.stringify(candidate)),
+    });
+  } catch (err) {
+    console.warn('Failed to add ICE candidate:', err);
+  }
+}
+
