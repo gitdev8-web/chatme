@@ -290,15 +290,43 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setReplyingTo(null);
     emitTyping(false);
 
-    await sendMessage(
-      activeConversationId,
-      user.uid,
-      profile?.displayName || user.displayName || 'User',
-      profile?.photoURL || user.photoURL || '',
-      text,
-      'text',
-      { replyTo: replyRef }
-    );
+    // Optimistic UI update
+    const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+    const optimisticMsg: Message = {
+      id: tempId,
+      conversationId: activeConversationId,
+      senderId: user.uid,
+      senderName: profile?.displayName || user.displayName || 'User',
+      senderPhotoURL: profile?.photoURL || user.photoURL || '',
+      text: text.trim(),
+      type: 'text',
+      createdAt: now,
+      updatedAt: now,
+      isEdited: false,
+      isDeleted: false,
+      deletedFor: [],
+      replyTo: replyRef,
+      reactions: {},
+      readBy: [user.uid],
+      deliveredTo: [user.uid],
+    };
+
+    setMessages((prev) => [...(prev || []), optimisticMsg]);
+
+    try {
+      await sendMessage(
+        activeConversationId,
+        user.uid,
+        profile?.displayName || user.displayName || 'User',
+        profile?.photoURL || user.photoURL || '',
+        text.trim(),
+        'text',
+        { replyTo: replyRef }
+      );
+    } catch (err) {
+      console.warn('Notice sending message:', err);
+    }
   };
 
   // Send file or voice message
@@ -333,6 +361,35 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setReplyingTo(null);
 
+      // Optimistic media message
+      const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const now = new Date().toISOString();
+      const optimisticMediaMsg: Message = {
+        id: tempId,
+        conversationId: activeConversationId,
+        senderId: user.uid,
+        senderName: profile?.displayName || user.displayName || 'User',
+        senderPhotoURL: profile?.photoURL || user.photoURL || '',
+        text: type === 'voice' ? 'Voice Message' : fileName,
+        type,
+        createdAt: now,
+        updatedAt: now,
+        isEdited: false,
+        isDeleted: false,
+        deletedFor: [],
+        replyTo: replyRef,
+        fileUrl: res.url,
+        fileName: res.name,
+        fileSize: res.size,
+        fileType: res.type,
+        audioDuration: duration,
+        reactions: {},
+        readBy: [user.uid],
+        deliveredTo: [user.uid],
+      };
+
+      setMessages((prev) => [...(prev || []), optimisticMediaMsg]);
+
       await sendMessage(
         activeConversationId,
         user.uid,
@@ -349,6 +406,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           replyTo: replyRef,
         }
       );
+    } catch (err) {
+      console.warn('Notice sending media message:', err);
     } finally {
       setTimeout(() => setUploadProgress(null), 500);
     }

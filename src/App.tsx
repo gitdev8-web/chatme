@@ -15,10 +15,11 @@ import { ChatArea } from './components/chat/ChatArea';
 import { ChatDetailsSidebar } from './components/chat/ChatDetailsSidebar';
 import { ContactsModal } from './components/contacts/ContactsModal';
 import { CreateGroupModal } from './components/groups/CreateGroupModal';
+import { GroupsHubModal } from './components/groups/GroupsHubModal';
+import { StatusModal } from './components/status/StatusModal';
 import { ProfileModal } from './components/profile/ProfileModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
-import { SchoolHubModal } from './components/campus/SchoolHubModal';
 import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { Realistic3DIcon } from './components/common/Realistic3DIcon';
@@ -39,10 +40,11 @@ const MainChatDashboard: React.FC = () => {
 
   const [isContactsOpen, setIsContactsOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isGroupsHubOpen, setIsGroupsHubOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [isSchoolHubOpen, setIsSchoolHubOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<BottomNavTab>('chats');
 
   // Synchronize initial URL route on mount
@@ -51,6 +53,10 @@ const MainChatDashboard: React.FC = () => {
     if (path.startsWith('/app/chat/')) {
       const convId = path.replace('/app/chat/', '').trim();
       if (convId) setActiveConversationId(convId);
+    } else if (path === '/app/status') {
+      setIsStatusOpen(true);
+    } else if (path === '/app/groups') {
+      setIsGroupsHubOpen(true);
     } else if (path === '/app/contacts') {
       setIsContactsOpen(true);
     } else if (path === '/app/settings') {
@@ -79,13 +85,12 @@ const MainChatDashboard: React.FC = () => {
     if (tab === 'chats') {
       setActiveConversationId(null);
       setActiveFilter('all');
+    } else if (tab === 'status') {
+      setIsStatusOpen(true);
+    } else if (tab === 'groups') {
+      setIsGroupsHubOpen(true);
     } else if (tab === 'contacts') {
       setIsContactsOpen(true);
-    } else if (tab === 'hub') {
-      setIsSchoolHubOpen(true);
-    } else if (tab === 'notices') {
-      setActiveConversationId(null);
-      setActiveFilter('groups');
     } else if (tab === 'settings') {
       setIsSettingsOpen(true);
     }
@@ -102,12 +107,13 @@ const MainChatDashboard: React.FC = () => {
         } w-full md:w-80 lg:w-[360px] xl:w-[390px] flex-shrink-0 h-full overflow-hidden`}
       >
         <Sidebar
+          onOpenStatus={() => setIsStatusOpen(true)}
+          onOpenGroupsHub={() => setIsGroupsHubOpen(true)}
           onOpenContacts={() => setIsContactsOpen(true)}
           onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenAdmin={() => setIsAdminOpen(true)}
           onOpenProfile={() => setIsProfileOpen(true)}
-          onOpenSchoolHub={() => setIsSchoolHubOpen(true)}
         />
       </div>
 
@@ -145,22 +151,26 @@ const MainChatDashboard: React.FC = () => {
         />
       )}
 
-      {/* Modals */}
-      <SchoolHubModal
-        isOpen={isSchoolHubOpen}
+      {/* WhatsApp Status Updates Modal */}
+      <StatusModal
+        isOpen={isStatusOpen}
         onClose={() => {
-          setIsSchoolHubOpen(false);
+          setIsStatusOpen(false);
           setActiveBottomTab('chats');
-        }}
-        onSelectModule={(mod) => {
-          if (mod === 'messages' || mod === 'notices') {
-            setActiveFilter(mod === 'messages' ? 'direct' : 'groups');
-          } else {
-            setIsContactsOpen(true);
-          }
         }}
       />
 
+      {/* WhatsApp Groups Hub Modal */}
+      <GroupsHubModal
+        isOpen={isGroupsHubOpen}
+        onClose={() => {
+          setIsGroupsHubOpen(false);
+          setActiveBottomTab('chats');
+        }}
+        onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
+      />
+
+      {/* Contacts / Start Chat Modal */}
       <ContactsModal
         isOpen={isContactsOpen}
         onClose={() => {
@@ -169,16 +179,19 @@ const MainChatDashboard: React.FC = () => {
         }}
       />
 
+      {/* Create Group Modal */}
       <CreateGroupModal
         isOpen={isCreateGroupOpen}
         onClose={() => setIsCreateGroupOpen(false)}
       />
 
+      {/* Profile Modal */}
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
       />
 
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => {
@@ -188,6 +201,7 @@ const MainChatDashboard: React.FC = () => {
         onOpenProfile={() => setIsProfileOpen(true)}
       />
 
+      {/* Admin Dashboard */}
       <AdminDashboardModal
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
@@ -232,7 +246,11 @@ const AppContent: React.FC = () => {
 
   React.useEffect(() => {
     if (user && profile) {
-      if (window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/phone') {
+      if (
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/register' ||
+        window.location.pathname === '/phone'
+      ) {
         window.history.replaceState(null, '', '/');
       }
     }
@@ -246,9 +264,9 @@ const AppContent: React.FC = () => {
         </div>
         <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
           <span>Chattr</span>
-          <span className="text-[#25d366]">Campus</span>
+          <span className="text-[#25d366]">Web</span>
         </h2>
-        <p className="mt-2 text-xs text-[#8696a0]">Connecting to secure messaging channels...</p>
+        <p className="mt-2 text-xs text-[#8696a0]">End-to-end encrypted messaging</p>
       </div>
     );
   }
@@ -283,7 +301,7 @@ const AppContent: React.FC = () => {
         </div>
         <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
           <span>Chattr</span>
-          <span className="text-[#25d366]">Campus</span>
+          <span className="text-[#25d366]">Web</span>
         </h2>
         <p className="mt-2 text-xs text-[#8696a0]">Opening your chats...</p>
       </div>

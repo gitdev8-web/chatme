@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   MessageSquare,
-  School,
   Sparkles,
+  Users,
+  Plus,
+  CircleDashed,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -16,25 +18,28 @@ import { ConversationItem } from './ConversationItem';
 import { Avatar } from '../common/Avatar';
 import { ConversationSkeleton } from '../common/LoadingSkeleton';
 import { EmptyState } from '../common/EmptyState';
-import { PWAInstallButton } from '../common/PWAInstallButton';
 import { Realistic3DIcon } from '../common/Realistic3DIcon';
+import { subscribeToStatusStories } from '../../services/statusService';
+import { UserStatusStory } from '../../types';
 
 interface SidebarProps {
+  onOpenStatus: () => void;
+  onOpenGroupsHub: () => void;
   onOpenContacts: () => void;
   onOpenCreateGroup: () => void;
   onOpenSettings: () => void;
   onOpenAdmin: () => void;
   onOpenProfile: () => void;
-  onOpenSchoolHub: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  onOpenStatus,
+  onOpenGroupsHub,
   onOpenContacts,
   onOpenCreateGroup,
   onOpenSettings,
   onOpenAdmin,
   onOpenProfile,
-  onOpenSchoolHub,
 }) => {
   const { user, profile, isAdmin } = useAuth();
   const {
@@ -48,6 +53,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } = useChat();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [statuses, setStatuses] = useState<UserStatusStory[]>([]);
+
+  // Subscribe to live status updates for the story strip
+  useEffect(() => {
+    const unsub = subscribeToStatusStories((list) => {
+      setStatuses(list);
+    });
+    return () => unsub();
+  }, []);
 
   // Filter conversations
   const filteredConversations = conversations.filter((conv) => {
@@ -70,16 +84,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Search query filter
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      if (conv.type === 'group' && conv.name?.toLowerCase().includes(q)) return true;
-      if (conv.lastMessage?.text?.toLowerCase().includes(q)) return true;
+      if (conv.type === 'group' && (conv.name || '').toLowerCase().includes(q)) return true;
+      if ((conv.lastMessage?.text || '').toLowerCase().includes(q)) return true;
 
       // Check partner's name or username
-      const partnerId = conv.participantIds.find((id) => id !== user?.uid);
+      const partnerId = conv.participantIds?.find((id) => id !== user?.uid);
       if (partnerId && userCache[partnerId]) {
         const p = userCache[partnerId];
         return (
-          p.displayName.toLowerCase().includes(q) ||
-          p.username.toLowerCase().includes(q)
+          (p.displayName || '').toLowerCase().includes(q) ||
+          (p.username || '').toLowerCase().includes(q)
         );
       }
       return false;
@@ -94,6 +108,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
   const otherConversations = filteredConversations.filter(
     (c) => !c.pinnedBy?.includes(user?.uid || '')
+  );
+
+  const hasUnreadStories = statuses.some(
+    (s) => s.userId !== user?.uid && !s.viewedBy?.includes(user?.uid || '')
   );
 
   return (
@@ -124,31 +142,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 3D Action icons toolbar */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          {/* School Hub 3D Icon */}
+          {/* WhatsApp Status 3D Icon */}
           <div
-            onClick={onOpenSchoolHub}
-            className="cursor-pointer"
-            title="School Management Hub"
+            onClick={onOpenStatus}
+            className="cursor-pointer relative"
+            title="Status Updates"
           >
-            <Realistic3DIcon name="classes" size="sm" showDots={false} />
+            <Realistic3DIcon
+              name="status"
+              size="sm"
+              showDots={false}
+              badge={hasUnreadStories ? '•' : undefined}
+            />
           </div>
 
-          {/* New Chat / Directory 3D Icon */}
+          {/* Groups 3D Icon */}
+          <div
+            onClick={onOpenGroupsHub}
+            className="cursor-pointer"
+            title="Groups & Communities"
+          >
+            <Realistic3DIcon name="groups" size="sm" showDots={false} />
+          </div>
+
+          {/* New Chat / Contacts 3D Icon */}
           <div
             onClick={onOpenContacts}
             className="cursor-pointer"
-            title="Student & Teacher Directory"
+            title="New Chat & Contacts"
           >
             <Realistic3DIcon name="students" size="sm" showDots={false} />
-          </div>
-
-          {/* New Group 3D Icon */}
-          <div
-            onClick={onOpenCreateGroup}
-            className="cursor-pointer"
-            title="Create Class / Group"
-          >
-            <Realistic3DIcon name="teachers" size="sm" showDots={false} />
           </div>
 
           {/* Settings 3D Icon */}
@@ -173,29 +196,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* School Management Quick Card Banner */}
-      <div
-        onClick={onOpenSchoolHub}
-        className="mx-3 mt-3 p-2.5 rounded-2xl bg-gradient-to-r from-[#005c4b]/50 to-[#128c7e]/20 border border-[#25d366]/20 cursor-pointer hover:border-[#25d366]/40 transition-all flex items-center justify-between shadow-sm"
-        title="Open School Management System"
-      >
-        <div className="flex items-center gap-2.5">
-          <Realistic3DIcon name="dashboard" size="sm" showDots={false} />
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-[#e9edef]">School Management</span>
-              <span className="text-[9px] font-semibold bg-[#25d366]/20 text-[#25d366] px-1.5 py-0.2 rounded-full">
-                Active
-              </span>
-            </div>
-            <p className="text-[10px] text-[#8696a0]">
-              Students (1,248) • Teachers (64) • Classes (18)
-            </p>
-          </div>
+      {/* WhatsApp Status Story Carousel Banner */}
+      <div className="border-b border-[#222d34]/60 bg-[#17242b]/60 px-3 py-2.5">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#8696a0]">
+            Status Stories
+          </span>
+          <button
+            onClick={onOpenStatus}
+            className="text-[11px] font-semibold text-[#25d366] hover:underline"
+          >
+            View All →
+          </button>
         </div>
-        <span className="text-[11px] font-semibold text-[#25d366] hover:underline">
-          Hub →
-        </span>
+
+        {/* Horizontal Avatar Strip */}
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
+          {/* Add My Status */}
+          <div
+            onClick={onOpenStatus}
+            className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group"
+          >
+            <div className="relative">
+              <div className="p-0.5 rounded-full ring-2 ring-[#25d366]/40 group-hover:ring-[#25d366] transition">
+                <Avatar
+                  src={profile?.photoURL}
+                  name={profile?.displayName || 'Me'}
+                  size="sm"
+                />
+              </div>
+              <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#00a884] text-white ring-1 ring-[#111b21]">
+                <Plus className="h-2.5 w-2.5 stroke-[3]" />
+              </div>
+            </div>
+            <span className="text-[10px] text-[#8696a0] group-hover:text-white truncate max-w-[50px]">
+              My Status
+            </span>
+          </div>
+
+          {/* Contact statuses */}
+          {statuses
+            .filter((s) => s.userId !== user?.uid)
+            .slice(0, 10)
+            .map((story) => {
+              const isUnviewed = !story.viewedBy?.includes(user?.uid || '');
+              return (
+                <div
+                  key={story.id}
+                  onClick={onOpenStatus}
+                  className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group"
+                >
+                  <div
+                    className={`p-0.5 rounded-full ${
+                      isUnviewed
+                        ? 'bg-gradient-to-tr from-[#25d366] to-[#128c7e] ring-2 ring-[#25d366]/80 animate-pulse'
+                        : 'bg-[#8696a0]/30 ring-1 ring-[#8696a0]/40'
+                    }`}
+                  >
+                    <Avatar
+                      src={story.userPhotoURL}
+                      name={story.userName}
+                      size="sm"
+                    />
+                  </div>
+                  <span className="text-[10px] text-[#8696a0] group-hover:text-white truncate max-w-[55px]">
+                    {story.userName.split(' ')[0]}
+                  </span>
+                </div>
+              );
+            })}
+        </div>
       </div>
 
       {/* Search Bar - WhatsApp Style */}
@@ -217,7 +287,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {[
           { id: 'all', label: 'All' },
           { id: 'direct', label: 'Direct' },
-          { id: 'groups', label: 'Classes & Groups' },
+          { id: 'groups', label: 'Groups' },
           { id: 'unread', label: 'Unread' },
           { id: 'archived', label: 'Archived' },
         ].map((tab) => (
@@ -226,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setActiveFilter(tab.id as typeof activeFilter)}
             className={`rounded-full px-3 py-1 text-[11px] font-medium transition-all whitespace-nowrap ${
               activeFilter === tab.id
-                ? 'bg-[#005c4b] text-[#25d366] ring-1 ring-[#25d366]/40'
+                ? 'bg-[#005c4b] text-[#25d366] ring-1 ring-[#25d366]/40 font-semibold'
                 : 'bg-[#202c33] text-[#8696a0] hover:text-[#e9edef]'
             }`}
           >
@@ -249,65 +319,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={searchTerm ? 'No matches found' : 'No conversations yet'}
             description={
               searchTerm
-                ? 'Try searching with another name or stream.'
-                : 'Start a chat with a teacher, student or parent, or launch the School Hub.'
+                ? `No chats match "${searchTerm}"`
+                : 'Start a direct chat or create a group to begin messaging.'
             }
-            actionText={searchTerm ? undefined : 'Start a New Chat'}
-            onAction={searchTerm ? undefined : onOpenContacts}
-            className="pt-12"
+            actionText="Start a Chat"
+            onAction={onOpenContacts}
           />
         ) : (
           <>
             {/* Pinned Section */}
             {pinnedConversations.length > 0 && (
               <div className="mb-2">
-                <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#8696a0]">
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#8696a0]">
                   Pinned Chats
                 </div>
                 {pinnedConversations.map((conv) => (
                   <ConversationItem
                     key={conv.id}
                     conversation={conv}
-                    isActive={activeConversationId === conv.id}
+                    isActive={conv.id === activeConversationId}
                     currentUserId={user?.uid || ''}
                     userCache={userCache}
-                    onSelect={(id) => setActiveConversationId(id)}
+                    onSelect={() => setActiveConversationId(conv.id)}
                   />
                 ))}
               </div>
             )}
 
-            {/* All / Recent Section */}
-            {otherConversations.length > 0 && (
-              <div>
-                {pinnedConversations.length > 0 && (
-                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#8696a0]">
-                    All Messages
-                  </div>
-                )}
-                {otherConversations.map((conv) => (
-                  <ConversationItem
-                    key={conv.id}
-                    conversation={conv}
-                    isActive={activeConversationId === conv.id}
-                    currentUserId={user?.uid || ''}
-                    userCache={userCache}
-                    onSelect={(id) => setActiveConversationId(id)}
-                  />
-                ))}
-              </div>
-            )}
+            {/* Other Conversations */}
+            {otherConversations.map((conv) => (
+              <ConversationItem
+                key={conv.id}
+                conversation={conv}
+                isActive={conv.id === activeConversationId}
+                currentUserId={user?.uid || ''}
+                userCache={userCache}
+                onSelect={() => setActiveConversationId(conv.id)}
+              />
+            ))}
           </>
         )}
-      </div>
-
-      {/* Footer PWA Install */}
-      <div className="border-t border-[#222d34] bg-[#202c33]/50 p-2.5 flex items-center justify-between text-xs text-[#8696a0]">
-        <span className="flex items-center gap-1.5 font-semibold text-[#e9edef]">
-          <Realistic3DIcon name="whatsapp" size="xs" showDots={false} />
-          <span>Chattr</span>
-        </span>
-        <PWAInstallButton compact />
       </div>
     </aside>
   );

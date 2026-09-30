@@ -13,11 +13,14 @@ import {
   CornerDownRight,
   Image as ImageIcon,
   File as FileIcon,
+  Camera,
+  Headphones,
 } from 'lucide-react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { VoiceRecorderComponent } from './VoiceRecorderComponent';
+import { MediaPreviewModal } from './MediaPreviewModal';
 
 const EMOJI_LIST = [
   '😀', '😂', '😍', '🔥', '👍', '❤️', '🎉', '🙌',
@@ -27,7 +30,12 @@ const EMOJI_LIST = [
 
 interface MessageComposerProps {
   onSendTextMessage: (text: string) => Promise<void>;
-  onSendFileMessage: (file: File | Blob, type: 'file' | 'image' | 'voice', fileName: string, duration?: number) => Promise<void>;
+  onSendFileMessage: (
+    file: File | Blob,
+    type: 'file' | 'image' | 'voice',
+    fileName: string,
+    duration?: number
+  ) => Promise<void>;
 }
 
 export const MessageComposer: React.FC<MessageComposerProps> = ({
@@ -39,9 +47,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const voiceRecorder = useVoiceRecorder();
 
@@ -82,12 +95,32 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isImage = false) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setPendingImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPendingImagePreview(reader.result as string);
+        setIsMediaPreviewOpen(true);
+      };
+      reader.readAsDataURL(file);
+      setShowAttachMenu(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setShowAttachMenu(false);
-      onSendFileMessage(file, isImage ? 'image' : 'file', file.name);
+      onSendFileMessage(file, 'file', file.name);
     }
+  };
+
+  const handleSendImageWithCaption = async (file: File, caption: string) => {
+    await onSendFileMessage(file, 'image', caption || file.name);
+    setPendingImageFile(null);
+    setPendingImagePreview(null);
   };
 
   const handleSendVoiceNote = async () => {
@@ -106,7 +139,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     <div className="relative border-t border-[#222d34] bg-[#202c33] px-3.5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] select-none">
       {/* Upload Progress Bar */}
       {uploadProgress !== null && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-[#111b21] overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#111b21] overflow-hidden z-20">
           <div
             className="h-full bg-gradient-to-r from-[#25d366] to-[#128c7e] transition-all duration-200"
             style={{ width: `${uploadProgress}%` }}
@@ -162,19 +195,34 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
           {/* Attachment Popup */}
           {showAttachMenu && (
-            <div className="absolute bottom-16 left-12 z-30 flex flex-col gap-1 rounded-2xl border border-[#222d34] bg-[#202c33] p-2 shadow-2xl backdrop-blur-md animate-in fade-in w-44">
+            <div className="absolute bottom-16 left-12 z-30 flex flex-col gap-1 rounded-2xl border border-[#222d34] bg-[#202c33] p-2 shadow-2xl backdrop-blur-md animate-in fade-in w-48">
               <button
                 onClick={() => imageInputRef.current?.click()}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
-                <ImageIcon className="h-4 w-4 text-[#25d366]" />
-                <span>Photos & Media</span>
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#bf59cf]/20 text-[#bf59cf]">
+                  <ImageIcon className="h-4 w-4" />
+                </div>
+                <span>Photos & Videos</span>
               </button>
+
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#e0547d]/20 text-[#e0547d]">
+                  <Camera className="h-4 w-4" />
+                </div>
+                <span>Camera</span>
+              </button>
+
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
-                <FileIcon className="h-4 w-4 text-[#53bdeb]" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#53bdeb]/20 text-[#53bdeb]">
+                  <FileIcon className="h-4 w-4" />
+                </div>
                 <span>Document</span>
               </button>
             </div>
@@ -184,14 +232,22 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           <input
             type="file"
             ref={imageInputRef}
+            accept="image/*,video/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
             accept="image/*"
-            onChange={(e) => handleFileSelect(e, true)}
+            capture="environment"
+            onChange={handleImageSelect}
             className="hidden"
           />
           <input
             type="file"
             ref={fileInputRef}
-            onChange={(e) => handleFileSelect(e, false)}
+            onChange={handleFileSelect}
             className="hidden"
           />
 
@@ -251,6 +307,19 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           )}
         </div>
       )}
+
+      {/* Media Preview Modal */}
+      <MediaPreviewModal
+        isOpen={isMediaPreviewOpen}
+        file={pendingImageFile}
+        previewUrl={pendingImagePreview}
+        onClose={() => {
+          setIsMediaPreviewOpen(false);
+          setPendingImageFile(null);
+          setPendingImagePreview(null);
+        }}
+        onSend={handleSendImageWithCaption}
+      />
     </div>
   );
 };

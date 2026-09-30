@@ -6,18 +6,20 @@
 import React from 'react';
 import { Realistic3DIcon } from '../common/Realistic3DIcon';
 
-export type BottomNavTab = 'chats' | 'contacts' | 'hub' | 'notices' | 'settings';
+export type BottomNavTab = 'chats' | 'status' | 'groups' | 'contacts' | 'settings';
 
 interface BottomNavProps {
   activeTab: BottomNavTab;
   onTabChange: (tab: BottomNavTab) => void;
   unreadCount?: number;
+  hasUnreadStatus?: boolean;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onTabChange,
   unreadCount = 0,
+  hasUnreadStatus = false,
 }) => {
   const tabs = [
     {
@@ -27,19 +29,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       badge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
     },
     {
+      id: 'status' as BottomNavTab,
+      label: 'Status',
+      iconName: 'status',
+      badge: hasUnreadStatus ? '•' : undefined,
+    },
+    {
+      id: 'groups' as BottomNavTab,
+      label: 'Groups',
+      iconName: 'groups',
+    },
+    {
       id: 'contacts' as BottomNavTab,
-      label: 'Directory',
+      label: 'Contacts',
       iconName: 'students',
-    },
-    {
-      id: 'hub' as BottomNavTab,
-      label: 'School Hub',
-      iconName: 'classes',
-    },
-    {
-      id: 'notices' as BottomNavTab,
-      label: 'Notices',
-      iconName: 'notices',
     },
     {
       id: 'settings' as BottomNavTab,

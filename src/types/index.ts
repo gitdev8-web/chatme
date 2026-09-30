@@ -93,6 +93,22 @@ export interface TypingStatus {
   timestamp: number;
 }
 
+export interface UserStatusStory {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhotoURL?: string;
+  type: 'text' | 'image';
+  text?: string;
+  caption?: string;
+  mediaUrl?: string;
+  backgroundColor?: string;
+  fontFamily?: string;
+  createdAt: string;
+  expiresAt: string;
+  viewedBy: string[]; // user UIDs
+}
+
 export interface ModerationReport {
   id: string;
   reporterId: string;
