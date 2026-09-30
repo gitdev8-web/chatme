@@ -230,6 +230,14 @@ const AppContent: React.FC = () => {
     }
   }, [authView, user, loading]);
 
+  React.useEffect(() => {
+    if (user && profile) {
+      if (window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/phone') {
+        window.history.replaceState(null, '', '/');
+      }
+    }
+  }, [user, profile]);
+
   if (loading) {
     return (
       <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
@@ -240,7 +248,7 @@ const AppContent: React.FC = () => {
           <span>Chattr</span>
           <span className="text-[#25d366]">Campus</span>
         </h2>
-        <p className="mt-2 text-xs text-[#8696a0]">Connecting to secure school messaging channels...</p>
+        <p className="mt-2 text-xs text-[#8696a0]">Connecting to secure messaging channels...</p>
       </div>
     );
   }
@@ -266,9 +274,20 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Authenticated via phone or Google, but profile setup pending
+  // Authenticated, waiting for profile sync
   if (!profile) {
-    return <PhoneAuthView />;
+    return (
+      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
+        <div className="mb-4">
+          <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
+        </div>
+        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
+          <span>Chattr</span>
+          <span className="text-[#25d366]">Campus</span>
+        </h2>
+        <p className="mt-2 text-xs text-[#8696a0]">Opening your chats...</p>
+      </div>
+    );
   }
 
   return (

@@ -21,14 +21,8 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
-  collection,
-  query,
-  where,
-  getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -73,60 +67,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserProfile = async (currentUser: User): Promise<UserProfile | null> => {
     const userDocRef = doc(db, 'users', currentUser.uid);
     try {
-      const snap = await getDoc(userDocRef);
-      if (snap.exists()) {
+      const getDocWithTimeout = Promise.race([
+        getDoc(userDocRef),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Firestore timeout')), 2500)
+        ),
+      ]);
+
+      const snap = await getDocWithTimeout;
+      if (snap && snap.exists()) {
         const data = snap.data() as UserProfile;
         setProfile(data);
         return data;
-      } else {
-        // Create initial profile if first login (e.g. Google Sign In)
-        const defaultUsername = (currentUser.email?.split('@')[0] || 'user')
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '')
-          .slice(0, 20);
-
-        const newProfile: UserProfile = {
-          uid: currentUser.uid,
-          email: currentUser.email || '',
-          displayName: currentUser.displayName || 'Chattr User',
-          username: defaultUsername || `user_${currentUser.uid.slice(0, 5)}`,
-          photoURL: currentUser.photoURL || '',
-          bio: 'Hey there! I am using Chattr.',
-          status: 'Available',
-          isOnline: true,
-          lastSeen: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          showOnlineStatus: true,
-          showLastSeen: true,
-          readReceipts: true,
-          enterToSend: true,
-          theme: 'dark',
-          blockedUserIds: [],
-        };
-
-        await setDoc(userDocRef, newProfile);
-        try {
-          await setDoc(doc(db, 'usernames', newProfile.username), {
-            uid: currentUser.uid,
-            username: newProfile.username,
-            createdAt: new Date().toISOString(),
-          });
-        } catch {
-          // Soft fail
-        }
-        setProfile(newProfile);
-        return newProfile;
       }
-    } catch (err) {
-      handleFirestoreError(err, OperationType.GET, `users/${currentUser.uid}`);
-      return null;
+    } catch {
+      // Fallback
     }
+
+    const defaultUsername = (currentUser.email?.split('@')[0] || `user_${currentUser.uid.slice(0, 5)}`)
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 20);
+
+    const newProfile: UserProfile = {
+      uid: currentUser.uid,
+      email: currentUser.email || '',
+      displayName: currentUser.displayName || 'Chattr User',
+      username: defaultUsername || `user_${currentUser.uid.slice(0, 5)}`,
+      photoURL: currentUser.photoURL || '',
+      bio: 'Hey there! I am using Chattr.',
+      status: 'Available',
+      isOnline: true,
+      lastSeen: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      showOnlineStatus: true,
+      showLastSeen: true,
+      readReceipts: true,
+      enterToSend: true,
+      theme: 'dark',
+      blockedUserIds: [],
+    };
+
+    setProfile(newProfile);
+
+    // Save in background with merge
+    Promise.allSettled([
+      setDoc(userDocRef, newProfile, { merge: true }),
+      setDoc(doc(db, 'usernames', newProfile.username), {
+        uid: currentUser.uid,
+        username: newProfile.username,
+        createdAt: new Date().toISOString(),
+      }, { merge: true }),
+    ]).catch(() => {});
+
+    return newProfile;
   };
 
-  // Check admin authorization
   const checkAdminStatus = async (currentUser: User) => {
-    // Check runtime bootstrapped email
     if (currentUser.email?.toLowerCase() === 'gitdev8@gmail.com') {
       setIsAdmin(true);
       return;
@@ -134,27 +132,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const adminSnap = await getDoc(doc(db, 'admins', currentUser.uid));
-      if (adminSnap.exists()) {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
+      setIsAdmin(adminSnap.exists());
     } catch {
       setIsAdmin(false);
     }
   };
 
-  // Manage Presence
   const updatePresence = async (isOnline: boolean) => {
-    if (!auth.currentUser) return;
+    const currentUser = auth.currentUser || user;
+    if (!currentUser) return;
     try {
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userRef, {
+      await setDoc(doc(db, 'users', currentUser.uid), {
         isOnline,
         lastSeen: new Date().toISOString(),
-      });
+      }, { merge: true });
     } catch {
-      // Ignore background presence failures on unload
+      // Ignore background presence failures
     }
   };
 
@@ -162,9 +155,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        await fetchUserProfile(currentUser);
-        await checkAdminStatus(currentUser);
-        await updatePresence(true);
+        fetchUserProfile(currentUser).then(() => {
+          checkAdminStatus(currentUser);
+          updatePresence(true);
+        });
       } else {
         setProfile(null);
         setIsAdmin(false);
@@ -201,11 +195,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const snap = await getDoc(doc(db, 'usernames', cleaned));
       if (!snap.exists()) return true;
       const data = snap.data();
-      if (user && data?.uid === user.uid) return true;
+      const currentUid = user?.uid || auth.currentUser?.uid;
+      if (currentUid && data?.uid === currentUid) return true;
       return false;
-    } catch (err) {
-      // Graceful fallback to avoid blocking sign up
-      return true;
+    } catch {
+      return true; // Graceful fallback
     }
   };
 
@@ -218,10 +212,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     bio?: string
   ) => {
     const cleanedUsername = username.toLowerCase().trim();
-    const isAvail = await checkUsernameAvailable(cleanedUsername);
-    if (!isAvail) {
-      throw new Error(`Username "@${cleanedUsername}" is already taken. Please choose another.`);
-    }
 
     let cred;
     try {
@@ -230,26 +220,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const authMessage = authErr instanceof Error ? authErr.message : String(authErr);
       if (authMessage.includes('auth/operation-not-allowed')) {
         throw new Error(
-          'Email/Password provider is disabled in Firebase Console. Please use "Sign up with Google" or enable Email/Password under Firebase Console > Authentication > Sign-in method.'
+          'Email/Password sign-in is disabled in Firebase Console. Please enable Email/Password under Firebase Console > Authentication > Sign-in method.'
         );
       }
       throw authErr;
     }
 
     const currentUser = cred.user;
-
-    await updateProfile(currentUser, {
-      displayName,
-      photoURL: photoURL || '',
-    });
+    setUser(currentUser);
 
     const newProfile: UserProfile = {
       uid: currentUser.uid,
       email: currentUser.email || email,
-      displayName,
+      displayName: displayName.trim(),
       username: cleanedUsername,
       photoURL: photoURL || '',
-      bio: bio || 'Hey there! I am using Chattr.',
+      bio: bio?.trim() || 'Hey there! I am using Chattr.',
       status: 'Available',
       isOnline: true,
       lastSeen: new Date().toISOString(),
@@ -263,19 +249,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       blockedUserIds: [],
     };
 
-    try {
-      await setDoc(doc(db, 'users', currentUser.uid), newProfile);
-      // Register username
-      await setDoc(doc(db, 'usernames', cleanedUsername), {
+    setProfile(newProfile);
+    if (email.toLowerCase() === 'gitdev8@gmail.com') {
+      setIsAdmin(true);
+    }
+
+    Promise.allSettled([
+      updateProfile(currentUser, {
+        displayName: displayName.trim(),
+        photoURL: photoURL || '',
+      }),
+      setDoc(doc(db, 'users', currentUser.uid), newProfile, { merge: true }),
+      setDoc(doc(db, 'usernames', cleanedUsername), {
         uid: currentUser.uid,
         username: cleanedUsername,
         createdAt: new Date().toISOString(),
-      });
-      setProfile(newProfile);
-      await checkAdminStatus(currentUser);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${currentUser.uid}`);
-    }
+      }, { merge: true }),
+    ]).catch(() => {});
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
@@ -299,48 +289,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfileData = async (updates: Partial<UserProfile>) => {
-    if (!user) throw new Error('Not authenticated');
-
-    if (updates.username && updates.username !== profile?.username) {
-      const isAvail = await checkUsernameAvailable(updates.username);
-      if (!isAvail) {
-        throw new Error(`Username "@${updates.username}" is already taken.`);
-      }
-    }
-
-    const payload = {
-      ...updates,
+    const currentUser = user || auth.currentUser;
+    if (!currentUser) return;
+    const currentProfile = profile || {
+      uid: currentUser.uid,
+      email: currentUser.email || '',
+      displayName: currentUser.displayName || 'Chattr User',
+      username: `user_${currentUser.uid.slice(0, 5)}`,
+      photoURL: currentUser.photoURL || '',
+      bio: 'Hey there! I am using Chattr.',
+      status: 'Available',
+      isOnline: true,
+      lastSeen: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      showOnlineStatus: true,
+      showLastSeen: true,
+      readReceipts: true,
+      enterToSend: true,
+      theme: 'dark',
+      blockedUserIds: [],
     };
+    const updated = { ...currentProfile, ...updates, updatedAt: new Date().toISOString() };
+    setProfile(updated);
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), payload);
-      setProfile((prev) => (prev ? { ...prev, ...payload } : null));
-
+      await setDoc(doc(db, 'users', currentUser.uid), updated, { merge: true });
       if (updates.displayName || updates.photoURL !== undefined) {
-        await updateProfile(user, {
-          displayName: updates.displayName || user.displayName,
-          photoURL: updates.photoURL ?? user.photoURL,
+        await updateProfile(currentUser, {
+          displayName: updates.displayName || currentProfile.displayName,
+          photoURL: updates.photoURL !== undefined ? updates.photoURL : currentProfile.photoURL,
         });
       }
+      if (updates.username) {
+        await setDoc(doc(db, 'usernames', updates.username), {
+          uid: currentUser.uid,
+          username: updates.username,
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
-    }
-  };
-
-  const deleteAccount = async () => {
-    if (!user) return;
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        isDisabled: true,
-        displayName: 'Deleted User',
-        bio: '',
-        status: '',
-      });
-      await deleteUser(user);
-    } catch (err) {
-      console.error('Delete account error:', err);
-      throw err;
+      console.warn('Profile update notice:', err);
     }
   };
 
@@ -350,28 +339,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     photoURL?: string,
     bio?: string
   ): Promise<UserProfile> => {
-    if (!auth.currentUser) throw new Error('User not authenticated');
-    const currentUser = auth.currentUser;
-    const cleanedUsername = username.toLowerCase().trim();
-
-    const isAvail = await checkUsernameAvailable(cleanedUsername);
-    if (!isAvail) {
-      throw new Error(`Username "@${cleanedUsername}" is already taken.`);
+    const currentUser = user || auth.currentUser;
+    if (!currentUser) {
+      throw new Error('User session not found. Please log in again.');
     }
 
-    await updateProfile(currentUser, {
-      displayName,
-      photoURL: photoURL || '',
-    });
+    const cleanedUsername = (username || `user_${currentUser.uid.slice(0, 5)}`).toLowerCase().trim();
 
     const newProfile: UserProfile = {
       uid: currentUser.uid,
-      phoneNumber: currentUser.phoneNumber || '',
       email: currentUser.email || '',
-      displayName,
+      displayName: displayName.trim() || 'Chattr User',
       username: cleanedUsername,
       photoURL: photoURL || '',
-      bio: bio || 'Hey there! I am using Chattr.',
+      bio: bio?.trim() || 'Hey there! I am using Chattr.',
       status: 'Available',
       isOnline: true,
       lastSeen: new Date().toISOString(),
@@ -385,82 +366,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       blockedUserIds: [],
     };
 
-    await setDoc(doc(db, 'users', currentUser.uid), newProfile);
-    try {
-      await setDoc(doc(db, 'usernames', cleanedUsername), {
+    setUser(currentUser);
+    setProfile(newProfile);
+
+    Promise.allSettled([
+      updateProfile(currentUser, {
+        displayName: displayName.trim() || 'Chattr User',
+        photoURL: photoURL || '',
+      }),
+      setDoc(doc(db, 'users', currentUser.uid), newProfile, { merge: true }),
+      setDoc(doc(db, 'usernames', cleanedUsername), {
         uid: currentUser.uid,
         username: cleanedUsername,
         createdAt: new Date().toISOString(),
-      });
-    } catch {
-      // ignore
-    }
-    setProfile(newProfile);
+      }, { merge: true }),
+    ]).catch(() => {});
+
     return newProfile;
   };
 
-  const demoPhoneLogin = async (
-    phoneNumber: string = '+256700123456',
-    testName: string = 'Chattr User'
-  ) => {
-    let currentUser: User;
-    try {
-      const cred = await signInAnonymously(auth);
-      currentUser = cred.user;
-    } catch {
-      try {
-        const dummyEmail = `demo_${phoneNumber.replace(/[^0-9]/g, '') || '700123456'}@chattr.local`;
-        const dummyPass = 'ChattrDemo2026!';
-        const cred = await signInWithEmailAndPassword(auth, dummyEmail, dummyPass);
-        currentUser = cred.user;
-      } catch {
-        const dummyEmail = `demo_${phoneNumber.replace(/[^0-9]/g, '') || '700123456'}@chattr.local`;
-        const dummyPass = 'ChattrDemo2026!';
-        const cred = await createUserWithEmailAndPassword(auth, dummyEmail, dummyPass);
-        currentUser = cred.user;
-      }
-    }
+  const demoPhoneLogin = async (phoneNumber?: string, testName?: string) => {
+    const cred = await signInAnonymously(auth);
+    const currentUser = cred.user;
+    const name = testName || 'Chattr Demo User';
+    const num = phoneNumber || '+256700123456';
+    const randId = Math.random().toString(36).substring(2, 7);
 
+    const demoProfile: UserProfile = {
+      uid: currentUser.uid,
+      email: `${randId}@demo.chattr`,
+      displayName: name,
+      username: `user_${randId}`,
+      photoURL: `https://api.dicebear.com/7.x/bottts/svg?seed=${randId}`,
+      bio: `Logged in with ${num}`,
+      status: 'Available',
+      isOnline: true,
+      lastSeen: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      showOnlineStatus: true,
+      showLastSeen: true,
+      readReceipts: true,
+      enterToSend: true,
+      theme: 'dark',
+      blockedUserIds: [],
+    };
+
+    setProfile(demoProfile);
     setUser(currentUser);
-    const existing = await fetchUserProfile(currentUser);
-    if (!existing) {
-      const baseUsername = `user_${phoneNumber.replace(/[^0-9]/g, '').slice(-5) || currentUser.uid.slice(0, 5)}`;
-      const demoProfile: UserProfile = {
+
+    Promise.allSettled([
+      setDoc(doc(db, 'users', currentUser.uid), demoProfile, { merge: true }),
+      setDoc(doc(db, 'usernames', demoProfile.username), {
         uid: currentUser.uid,
-        phoneNumber,
-        displayName: testName,
-        username: baseUsername,
-        photoURL: '',
-        bio: 'Hey there! I am using Chattr.',
-        status: 'Available',
-        isOnline: true,
-        lastSeen: new Date().toISOString(),
+        username: demoProfile.username,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        showOnlineStatus: true,
-        showLastSeen: true,
-        readReceipts: true,
-        enterToSend: true,
-        theme: 'dark',
-        blockedUserIds: [],
-      };
-      await setDoc(doc(db, 'users', currentUser.uid), demoProfile);
-      try {
-        await setDoc(doc(db, 'usernames', baseUsername), {
-          uid: currentUser.uid,
-          username: baseUsername,
-          createdAt: new Date().toISOString(),
-        });
-      } catch {
-        // ignore
-      }
-      setProfile(demoProfile);
-    }
+      }, { merge: true }),
+    ]).catch(() => {});
   };
 
   const refreshProfile = async () => {
     if (user) {
       await fetchUserProfile(user);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!user) return;
+    try {
+      await signOut(auth);
+      await deleteUser(user);
+      setProfile(null);
+      setUser(null);
+    } catch (err) {
+      console.error('Delete account error:', err);
     }
   };
 

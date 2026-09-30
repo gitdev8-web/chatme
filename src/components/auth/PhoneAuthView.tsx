@@ -326,38 +326,31 @@ export const PhoneAuthView: React.FC<PhoneAuthViewProps> = ({ onSwitchToEmail })
     e.preventDefault();
     setError(null);
 
-    if (!displayName.trim()) {
-      setError('Please enter your display name.');
-      return;
-    }
-
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters.');
-      return;
-    }
-
-    if (usernameStatus === 'taken') {
-      setError(`Username @${username} is already taken. Please choose another.`);
-      return;
-    }
+    const nameToUse = displayName.trim() || 'Chattr Member';
+    const rawUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || nameToUse.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const userToUse = rawUsername.length >= 3 ? rawUsername : `user_${Math.random().toString(36).substring(2, 7)}`;
 
     setLoading(true);
     try {
       let finalPhotoURL = '';
       if (avatarFile) {
-        const uploadRes = await uploadFileWithProgress(
-          avatarFile,
-          'avatars',
-          `avatar_${username}_${Date.now()}.jpg`
-        );
-        finalPhotoURL = uploadRes.url;
+        try {
+          const uploadRes = await uploadFileWithProgress(
+            avatarFile,
+            'avatars',
+            `avatar_${userToUse}_${Date.now()}.jpg`
+          );
+          finalPhotoURL = uploadRes.url;
+        } catch {
+          // Graceful fallback
+        }
       }
 
       await completeProfileSetup(
-        displayName.trim(),
-        username.trim(),
+        nameToUse,
+        userToUse,
         finalPhotoURL,
-        bio.trim()
+        bio.trim() || 'Hey there! I am using Chattr.'
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save profile';
