@@ -23,6 +23,10 @@ import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
 import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { Realistic3DIcon } from './components/common/Realistic3DIcon';
+import { IncomingCallModal } from './components/calls/IncomingCallModal';
+import { CallModal } from './components/calls/CallModal';
+import { subscribeToIncomingCalls } from './services/callService';
+import { CallSession } from './types';
 
 const MainChatDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -46,6 +50,24 @@ const MainChatDashboard: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<BottomNavTab>('chats');
+
+  // Real-time call states
+  const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+  const [activeCallSession, setActiveCallSession] = useState<CallSession | null>(null);
+
+  // Subscribe to real-time incoming calls
+  React.useEffect(() => {
+    if (!user) {
+      setIncomingCall(null);
+      return;
+    }
+
+    const unsub = subscribeToIncomingCalls(user.uid, (call) => {
+      setIncomingCall(call);
+    });
+
+    return () => unsub();
+  }, [user]);
 
   // Synchronize initial URL route on mount
   React.useEffect(() => {
@@ -206,6 +228,29 @@ const MainChatDashboard: React.FC = () => {
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
       />
+
+      {/* Real-time Incoming Call Modal */}
+      <IncomingCallModal
+        call={incomingCall}
+        onAccept={(call) => {
+          setIncomingCall(null);
+          setActiveCallSession(call);
+        }}
+        onDecline={() => setIncomingCall(null)}
+      />
+
+      {/* Active Received Call Modal */}
+      {activeCallSession && (
+        <CallModal
+          isOpen={true}
+          isIncoming={true}
+          onClose={() => setActiveCallSession(null)}
+          contactName={activeCallSession.callerName}
+          contactPhoto={activeCallSession.callerPhoto}
+          callType={activeCallSession.callType}
+          callSessionId={activeCallSession.id}
+        />
+      )}
     </div>
   );
 };

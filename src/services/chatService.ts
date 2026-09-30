@@ -367,7 +367,8 @@ export async function toggleMessageReaction(
 
 export async function markConversationAsRead(
   conversationId: string,
-  currentUid: string
+  currentUid: string,
+  unreadMessageIds?: string[]
 ): Promise<void> {
   try {
     const convRef = doc(db, 'conversations', conversationId);
@@ -380,8 +381,38 @@ export async function markConversationAsRead(
       },
       { merge: true }
     );
+
+    if (unreadMessageIds && unreadMessageIds.length > 0) {
+      const updates = unreadMessageIds.slice(0, 30).map((msgId) => {
+        const msgRef = doc(db, 'conversations', conversationId, 'messages', msgId);
+        return updateDoc(msgRef, {
+          readBy: arrayUnion(currentUid),
+          deliveredTo: arrayUnion(currentUid),
+        }).catch(() => {});
+      });
+      await Promise.allSettled(updates);
+    }
   } catch {
     // Soft fail
+  }
+}
+
+export async function markMessagesAsDelivered(
+  conversationId: string,
+  currentUid: string,
+  messageIds: string[]
+): Promise<void> {
+  if (!messageIds || messageIds.length === 0) return;
+  try {
+    const updates = messageIds.slice(0, 20).map((msgId) => {
+      const msgRef = doc(db, 'conversations', conversationId, 'messages', msgId);
+      return updateDoc(msgRef, {
+        deliveredTo: arrayUnion(currentUid),
+      }).catch(() => {});
+    });
+    await Promise.allSettled(updates);
+  } catch {
+    // Non-critical
   }
 }
 

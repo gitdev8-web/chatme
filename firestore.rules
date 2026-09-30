@@ -42,6 +42,11 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    // Voice & Video Calls Signaling
+    match /calls/{callId} {
+      allow read, write: if isSignedIn();
+    }
+
     // Conversations Collection
     match /conversations/{conversationId} {
       allow read: if isSignedIn() && (

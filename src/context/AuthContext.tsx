@@ -21,6 +21,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { UserProfile } from '../types';
@@ -152,6 +153,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let profileUnsub: (() => void) | null = null;
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -159,9 +163,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           checkAdminStatus(currentUser);
           updatePresence(true);
         });
+
+        // Real-time listener for current user profile changes
+        profileUnsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile);
+          }
+        });
+
+        // Periodic presence heartbeat every 45s
+        heartbeatInterval = setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            updatePresence(true);
+          }
+        }, 45000);
       } else {
         setProfile(null);
         setIsAdmin(false);
+        if (profileUnsub) {
+          profileUnsub();
+          profileUnsub = null;
+        }
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
       }
       setLoading(false);
     });
@@ -183,6 +209,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       unsubscribe();
+      if (profileUnsub) profileUnsub();
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

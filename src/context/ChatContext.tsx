@@ -206,8 +206,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMessages(msgs);
         setLoadingMessages(false);
 
-        // Mark as read
-        markConversationAsRead(activeConversationId, user.uid);
+        // Mark as read in real-time
+        const unreadMsgIds = msgs
+          .filter((m) => m.senderId !== user.uid && (!m.readBy || !m.readBy.includes(user.uid)))
+          .map((m) => m.id);
+
+        markConversationAsRead(activeConversationId, user.uid, unreadMsgIds);
       },
       (error) => {
         handleFirestoreError(
@@ -245,6 +249,23 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       typingUnsub();
     };
   }, [user, activeConversationId]);
+
+  // Real-time listener for active chat partner profile (online presence, last seen, status updates)
+  useEffect(() => {
+    if (!user || !activeConversation || activeConversation.type !== 'direct') return;
+
+    const partnerId = activeConversation.participantIds?.find((id) => id !== user.uid);
+    if (!partnerId) return;
+
+    const unsub = onSnapshot(doc(db, 'users', partnerId), (snap) => {
+      if (snap.exists()) {
+        const uProfile = snap.data() as UserProfile;
+        setUserCache((prev) => ({ ...prev, [partnerId]: uProfile }));
+      }
+    });
+
+    return () => unsub();
+  }, [user, activeConversation?.id]);
 
   // Start direct chat
   const startDirectChat = async (targetUid: string): Promise<string> => {

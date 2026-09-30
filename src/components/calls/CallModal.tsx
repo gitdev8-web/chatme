@@ -18,6 +18,8 @@ import {
   RotateCw,
 } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
+import { sound } from '../../hooks/useSound';
+import { endCall, subscribeToCallSession } from '../../services/callService';
 
 interface CallModalProps {
   isOpen: boolean;
@@ -25,6 +27,8 @@ interface CallModalProps {
   contactName: string;
   contactPhoto?: string;
   callType: 'audio' | 'video';
+  callSessionId?: string;
+  isIncoming?: boolean;
 }
 
 export const CallModal: React.FC<CallModalProps> = ({
@@ -33,9 +37,13 @@ export const CallModal: React.FC<CallModalProps> = ({
   contactName,
   contactPhoto,
   callType: initialCallType,
+  callSessionId,
+  isIncoming = false,
 }) => {
   const [callType, setCallType] = useState<'audio' | 'video'>(initialCallType);
-  const [callStatus, setCallStatus] = useState<'ringing' | 'connected'>('ringing');
+  const [callStatus, setCallStatus] = useState<'ringing' | 'connected' | 'declined' | 'ended'>(
+    isIncoming ? 'connected' : 'ringing'
+  );
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(initialCallType === 'video');
@@ -50,11 +58,12 @@ export const CallModal: React.FC<CallModalProps> = ({
     setIsVideoEnabled(initialCallType === 'video');
   }, [initialCallType]);
 
-  // Handle ringing simulation transition to connected
+  // Real-time call signaling subscription
   useEffect(() => {
     if (!isOpen) {
-      setCallStatus('ringing');
+      setCallStatus(isIncoming ? 'connected' : 'ringing');
       setCallDuration(0);
+      sound.stopRingtone();
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
@@ -62,14 +71,46 @@ export const CallModal: React.FC<CallModalProps> = ({
       return;
     }
 
-    const connectTimeout = setTimeout(() => {
-      setCallStatus('connected');
-    }, 2800);
+    if (!isIncoming) {
+      sound.startRingtone();
+    }
 
-    return () => clearTimeout(connectTimeout);
-  }, [isOpen]);
+    if (callSessionId) {
+      const unsub = subscribeToCallSession(callSessionId, (session) => {
+        if (!session) return;
+        if (session.status === 'accepted') {
+          sound.stopRingtone();
+          setCallStatus('connected');
+        } else if (session.status === 'rejected') {
+          sound.stopRingtone();
+          sound.playCallEnd();
+          setCallStatus('declined');
+          setTimeout(() => onClose(), 1800);
+        } else if (session.status === 'ended') {
+          sound.stopRingtone();
+          sound.playCallEnd();
+          setCallStatus('ended');
+          setTimeout(() => onClose(), 1200);
+        }
+      });
+      return () => {
+        unsub();
+        sound.stopRingtone();
+      };
+    } else {
+      // Local fallback simulation if no remote session ID
+      const connectTimeout = setTimeout(() => {
+        sound.stopRingtone();
+        setCallStatus('connected');
+      }, 3000);
+      return () => {
+        clearTimeout(connectTimeout);
+        sound.stopRingtone();
+      };
+    }
+  }, [isOpen, callSessionId, isIncoming]);
 
-  // Call duration counter
+  // Call duration timer
   useEffect(() => {
     if (callStatus !== 'connected' || !isOpen) return;
 
@@ -131,6 +172,16 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   };
 
+  const handleHangup = async () => {
+    sound.stopRingtone();
+    sound.playCallEnd();
+    setCallStatus('ended');
+    if (callSessionId) {
+      await endCall(callSessionId);
+    }
+    setTimeout(() => onClose(), 600);
+  };
+
   return (
     <div
       className={`fixed z-50 transition-all duration-300 select-none ${
@@ -158,8 +209,8 @@ export const CallModal: React.FC<CallModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsMinimized(!isMinimized)}
-              className="rounded-full bg-black/40 p-2 text-white/80 hover:bg-black/60 hover:text-white transition"
-              title={isMinimized ? 'Expand' : 'Minimize'}
+              className="rounded-full p-2 text-[#8696a0] hover:bg-white/10 hover:text-white transition backdrop-blur-md"
+              title={isMinimized ? 'Maximize' : 'Minimize'}
             >
               {isMinimized ? (
                 <Maximize2 className="h-4 w-4" />
@@ -170,88 +221,106 @@ export const CallModal: React.FC<CallModalProps> = ({
           </div>
         </div>
 
-        {/* Video Mode or Audio Visualizer Center */}
-        <div className="relative flex-1 flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-[#182229] to-[#0b141a]">
+        {/* Call Body */}
+        <div className="relative flex-1 flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+          {/* Video Preview */}
           {isVideoEnabled ? (
-            <div className="relative h-full w-full bg-black flex items-center justify-center">
-              {/* Remote simulation video */}
-              <div className="flex flex-col items-center justify-center">
+            <div className="absolute inset-0 w-full h-full bg-[#111b21]">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover mirror"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none" />
+
+              {/* Small PiP Contact Avatar in Corner */}
+              <div className="absolute top-16 right-4 flex items-center gap-2 rounded-2xl bg-black/50 p-2 backdrop-blur-md border border-white/10">
                 <Avatar
                   src={contactPhoto}
                   name={contactName}
-                  size="2xl"
-                  className="ring-4 ring-[#25d366]/40"
+                  size="sm"
                 />
-                <h3 className="text-base font-bold text-white mt-3">{contactName}</h3>
-                <p className="text-xs text-[#25d366]">Video Connected</p>
-              </div>
-
-              {/* Local picture-in-picture stream */}
-              <div className="absolute bottom-24 right-4 h-36 w-24 sm:h-44 sm:w-32 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="h-full w-full object-cover -scale-x-100"
-                />
+                <span className="text-xs font-medium text-white pr-1">
+                  {contactName}
+                </span>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center p-6 z-10">
-              {/* Radar rings when ringing */}
+            /* Audio Call Ambient Background */
+            <div className="flex flex-col items-center relative z-10">
               <div className="relative mb-6">
                 {callStatus === 'ringing' && (
                   <>
-                    <div className="absolute -inset-4 rounded-full bg-[#25d366]/20 animate-ping pointer-events-none" />
-                    <div className="absolute -inset-8 rounded-full bg-[#25d366]/10 animate-pulse pointer-events-none" />
+                    <span className="absolute -inset-4 rounded-full bg-[#00a884]/20 animate-ping" />
+                    <span className="absolute -inset-2 rounded-full bg-[#00a884]/30 animate-pulse" />
                   </>
                 )}
-                <div className="p-1 rounded-full bg-gradient-to-tr from-[#25d366] to-[#00a884] ring-4 ring-[#25d366]/30 shadow-2xl">
-                  <Avatar
-                    src={contactPhoto}
-                    name={contactName}
-                    size="2xl"
-                  />
-                </div>
+                <Avatar
+                  src={contactPhoto}
+                  name={contactName}
+                  size="xl"
+                  className="ring-4 ring-[#00a884]/40 shadow-2xl relative"
+                />
               </div>
 
-              <h2 className="text-lg font-bold text-white tracking-wide">{contactName}</h2>
-              <p className="text-xs font-medium text-[#8696a0] mt-1">
+              <h3 className="text-2xl font-light text-[#e9edef] tracking-wide">
+                {contactName}
+              </h3>
+
+              <p className="mt-2 text-sm text-[#8696a0] font-mono">
                 {callStatus === 'ringing'
                   ? 'Ringing...'
-                  : `${callType === 'video' ? 'Video' : 'Voice'} Call • ${formatDuration(
-                      callDuration
-                    )}`}
+                  : callStatus === 'declined'
+                  ? 'Call Declined'
+                  : callStatus === 'ended'
+                  ? 'Call Ended'
+                  : formatDuration(callDuration)}
+              </p>
+            </div>
+          )}
+
+          {/* Video Call Name & Status Overlay */}
+          {isVideoEnabled && (
+            <div className="absolute bottom-28 left-0 right-0 z-20 flex flex-col items-center text-center">
+              <p className="text-xs font-mono text-white/90 bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
+                {callStatus === 'ringing'
+                  ? 'Connecting...'
+                  : callStatus === 'declined'
+                  ? 'Call Declined'
+                  : callStatus === 'ended'
+                  ? 'Call Ended'
+                  : formatDuration(callDuration)}
               </p>
             </div>
           )}
         </div>
 
-        {/* WhatsApp Call Controls Footer */}
-        <div className="z-30 bg-[#202c33]/90 backdrop-blur-md p-4 flex items-center justify-around border-t border-[#222d34]">
+        {/* Bottom Control Actions (Authentic WhatsApp Call Dock) */}
+        <div className="relative z-30 flex items-center justify-center gap-4 p-6 bg-gradient-to-t from-black/90 to-transparent">
           {/* Mute Mic */}
           <button
             onClick={() => setIsMuted(!isMuted)}
-            className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full transition shadow-lg ${
               isMuted
-                ? 'bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/50'
-                : 'bg-[#2a3942] text-white hover:bg-[#32434d]'
+                ? 'bg-red-500/20 text-red-400 ring-2 ring-red-500/50'
+                : 'bg-[#202c33] text-[#e9edef] hover:bg-[#374248]'
             }`}
-            title={isMuted ? 'Unmute' : 'Mute'}
+            title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           >
             {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </button>
 
-          {/* Toggle Video */}
+          {/* Toggle Video Camera */}
           <button
             onClick={toggleVideo}
-            className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
-              !isVideoEnabled
-                ? 'bg-[#2a3942] text-[#8696a0] hover:text-white'
-                : 'bg-[#00a884] text-white shadow-lg shadow-[#00a884]/30'
+            className={`flex h-12 w-12 items-center justify-center rounded-full transition shadow-lg ${
+              isVideoEnabled
+                ? 'bg-[#00a884] text-white shadow-[#00a884]/20'
+                : 'bg-[#202c33] text-[#e9edef] hover:bg-[#374248]'
             }`}
-            title={isVideoEnabled ? 'Turn Off Camera' : 'Turn On Camera'}
+            title={isVideoEnabled ? 'Turn camera off' : 'Turn camera on'}
           >
             {isVideoEnabled ? (
               <Video className="h-5 w-5" />
@@ -260,15 +329,15 @@ export const CallModal: React.FC<CallModalProps> = ({
             )}
           </button>
 
-          {/* Speakerphone */}
+          {/* Toggle Speaker */}
           <button
             onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-            className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full transition shadow-lg ${
               !isSpeakerOn
-                ? 'bg-[#2a3942] text-[#8696a0]'
-                : 'bg-[#2a3942] text-white hover:bg-[#32434d]'
+                ? 'bg-red-500/20 text-red-400'
+                : 'bg-[#202c33] text-[#e9edef] hover:bg-[#374248]'
             }`}
-            title="Speaker"
+            title={isSpeakerOn ? 'Mute speaker' : 'Unmute speaker'}
           >
             {isSpeakerOn ? (
               <Volume2 className="h-5 w-5" />
@@ -277,13 +346,13 @@ export const CallModal: React.FC<CallModalProps> = ({
             )}
           </button>
 
-          {/* End Call Button */}
+          {/* End Call (Red Hangup Button) */}
           <button
-            onClick={onClose}
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ea4335] text-white shadow-xl hover:bg-[#d93025] hover:scale-105 active:scale-95 transition-all"
-            title="End Call"
+            onClick={handleHangup}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ea4335] text-white shadow-xl hover:bg-[#d93025] hover:scale-105 active:scale-95 transition"
+            title="End call"
           >
-            <PhoneOff className="h-5 w-5 fill-current" />
+            <PhoneOff className="h-6 w-6" />
           </button>
         </div>
       </div>

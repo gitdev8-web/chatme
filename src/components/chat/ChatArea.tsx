@@ -28,6 +28,7 @@ import { Modal } from '../common/Modal';
 import { MessagesSkeleton } from '../common/LoadingSkeleton';
 import { ForwardModal } from './ForwardModal';
 import { CallModal } from '../calls/CallModal';
+import { initiateCall } from '../../services/callService';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -38,7 +39,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onBackMobile,
   onToggleDetails,
 }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const {
     activeConversation,
     messages,
@@ -66,6 +67,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Calling state
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
+  const [activeCallSessionId, setActiveCallSessionId] = useState<string | undefined>(undefined);
 
   // Header 3-dots menu
   const [showChatMenu, setShowChatMenu] = useState(false);
@@ -151,8 +153,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     });
   };
 
-  const handleStartCall = (type: 'audio' | 'video') => {
+  const handleStartCall = async (type: 'audio' | 'video') => {
     setCallType(type);
+    if (user && isDirect && partnerId) {
+      try {
+        const cid = await initiateCall(
+          user.uid,
+          profile?.displayName || user.displayName || 'DEV CHAT User',
+          profile?.photoURL || user.photoURL || '',
+          partnerId,
+          partnerProfile?.displayName || 'Contact',
+          type
+        );
+        setActiveCallSessionId(cid);
+      } catch (err) {
+        console.warn('Call initiation warning:', err);
+      }
+    }
     setIsCallOpen(true);
   };
 
@@ -469,10 +486,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       {/* Calling Modal */}
       <CallModal
         isOpen={isCallOpen}
-        onClose={() => setIsCallOpen(false)}
+        onClose={() => {
+          setIsCallOpen(false);
+          setActiveCallSessionId(undefined);
+        }}
         contactName={title}
         contactPhoto={avatarSrc}
         callType={callType}
+        callSessionId={activeCallSessionId}
       />
 
       {/* Edit Message Modal */}

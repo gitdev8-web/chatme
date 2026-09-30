@@ -125,3 +125,17 @@ export interface AdminRole {
   email: string;
   assignedAt: string;
 }
+
+export interface CallSession {
+  id: string;
+  callerId: string;
+  callerName: string;
+  callerPhoto?: string;
+  receiverId: string;
+  receiverName?: string;
+  callType: 'audio' | 'video';
+  status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'missed';
+  createdAt: string;
+  startedAt?: string;
+  endedAt?: string;
+}
