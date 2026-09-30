@@ -8,10 +8,11 @@ import React from 'react';
 interface AvatarProps {
   src?: string | null;
   name: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   isOnline?: boolean;
   showPresence?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 const sizeClasses = {
@@ -20,6 +21,7 @@ const sizeClasses = {
   md: 'w-10 h-10 text-sm',
   lg: 'w-12 h-12 text-base',
   xl: 'w-16 h-16 text-xl',
+  '2xl': 'w-24 h-24 text-3xl',
 };
 
 const presenceSizes = {
@@ -28,6 +30,7 @@ const presenceSizes = {
   md: 'w-2.5 h-2.5 right-0.5 bottom-0.5 border-2',
   lg: 'w-3.5 h-3.5 right-0.5 bottom-0.5 border-2',
   xl: 'w-4 h-4 right-1 bottom-1 border-2',
+  '2xl': 'w-5 h-5 right-2 bottom-2 border-2',
 };
 
 // Deterministic gradient based on string name
@@ -47,6 +50,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   isOnline = false,
   showPresence = false,
   className = '',
+  onClick,
 }) => {
   const getInitials = (str: string) => {
     if (!str) return '?';
@@ -67,7 +71,12 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   return (
-    <div className={`relative inline-flex flex-shrink-0 select-none ${className}`}>
+    <div
+      onClick={onClick}
+      className={`relative inline-flex flex-shrink-0 select-none ${
+        onClick ? 'cursor-pointer' : ''
+      } ${className}`}
+    >
       {src ? (
         <img
           src={src}

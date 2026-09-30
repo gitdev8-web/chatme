@@ -46,7 +46,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
             list.push({
               ...u,
               uid,
-              displayName: u?.displayName || 'Chattr User',
+              displayName: u?.displayName || 'DEV CHAT User',
               username: u?.username || `user_${uid.slice(0, 5)}`,
             });
           }
@@ -148,7 +148,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
                     />
                     <div className="min-w-0 truncate">
                       <h4 className="text-xs font-semibold text-slate-200 truncate">
-                        {u.displayName || 'Chattr User'}
+                        {u.displayName || 'DEV CHAT User'}
                       </h4>
                       <p className="text-[11px] text-slate-400 truncate">@{u.username || 'user'}</p>
                       {u.bio && (

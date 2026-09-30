@@ -263,7 +263,7 @@ const AppContent: React.FC = () => {
           <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
         </div>
         <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
-          <span>Chattr</span>
+          <span>DEV CHAT</span>
           <span className="text-[#25d366]">Web</span>
         </h2>
         <p className="mt-2 text-xs text-[#8696a0]">End-to-end encrypted messaging</p>
@@ -300,7 +300,7 @@ const AppContent: React.FC = () => {
           <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
         </div>
         <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
-          <span>Chattr</span>
+          <span>DEV CHAT</span>
           <span className="text-[#25d366]">Web</span>
         </h2>
         <p className="mt-2 text-xs text-[#8696a0]">Opening your chats...</p>

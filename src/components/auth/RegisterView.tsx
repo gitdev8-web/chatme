@@ -44,7 +44,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
-  const [bio, setBio] = useState('Hey there! I am using Chattr.');
+  const [bio, setBio] = useState('Hey there! I am using DEV CHAT.');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
 
@@ -175,7 +175,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     setError(null);
     setLoading(true);
     try {
-      await demoPhoneLogin('+256700123456', 'Chattr Member');
+      await demoPhoneLogin('+256700123456', 'DEV CHAT Developer');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Demo login failed';
       setError(msg);
@@ -197,11 +197,11 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
             <Realistic3DIcon name="whatsapp" size="xl" showDots={true} />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#e9edef] flex items-center justify-center gap-1.5">
-            <span>Create Your</span>
-            <span className="text-[#25d366]">Account</span>
+            <span>Join</span>
+            <span className="text-[#25d366]">DEV CHAT</span>
           </h1>
           <p className="mt-1 text-xs text-[#8696a0]">
-            Join Chattr to start chatting immediately with fast, secure messaging
+            Start chatting immediately with fast, secure messaging
           </p>
         </div>
 
@@ -467,7 +467,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={140}
-                placeholder="Hey there! I am using Chattr."
+                placeholder="Hey there! I am using DEV CHAT."
                 className="w-full rounded-xl border border-[#222d34] bg-[#202c33] px-3.5 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none focus:ring-1 focus:ring-[#25d366] transition"
               />
             </div>

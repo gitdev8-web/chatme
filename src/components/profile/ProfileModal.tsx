@@ -121,7 +121,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Profile"
-      subtitle="Manage your public identity on Chattr"
+      subtitle="Manage your public identity on DEV CHAT"
       maxWidth="md"
     >
       <form onSubmit={handleSave} className="space-y-4">

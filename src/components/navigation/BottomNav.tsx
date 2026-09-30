@@ -30,19 +30,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'status' as BottomNavTab,
-      label: 'Status',
+      label: 'Updates',
       iconName: 'status',
       badge: hasUnreadStatus ? '•' : undefined,
     },
     {
       id: 'groups' as BottomNavTab,
-      label: 'Groups',
+      label: 'Communities',
       iconName: 'groups',
     },
     {
       id: 'contacts' as BottomNavTab,
-      label: 'Contacts',
-      iconName: 'students',
+      label: 'Calls',
+      iconName: 'calls',
     },
     {
       id: 'settings' as BottomNavTab,

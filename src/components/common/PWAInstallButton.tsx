@@ -24,7 +24,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
         className={`flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium shadow-md shadow-emerald-950/40 hover:from-emerald-500 hover:to-teal-500 transition-all ${
           compact ? 'p-2 text-xs' : 'px-3.5 py-2 text-xs'
         }`}
-        title="Install Chattr app to device"
+        title="Install DEV CHAT app to device"
       >
         <Download className="h-4 w-4" />
         {!compact && <span>Install App</span>}
@@ -52,7 +52,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
             <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl text-left">
               <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
                 <Download className="h-5 w-5 text-emerald-400" />
-                Install Chattr on iOS
+                Install DEV CHAT on iOS
               </h3>
               <p className="mt-3 text-xs text-slate-300 leading-relaxed">
                 1. Tap the <strong className="text-white">Share</strong> button in your Safari toolbar at the bottom.<br />

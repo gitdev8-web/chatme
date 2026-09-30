@@ -6,11 +6,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
-  Info,
   Search,
   ChevronDown,
-  MessageSquare,
   Lock,
+  Phone,
+  Video,
+  MoreVertical,
+  X,
+  Laptop,
+  Smartphone,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -21,9 +26,8 @@ import { MessageComposer } from './MessageComposer';
 import { MediaViewerModal } from './MediaViewerModal';
 import { Modal } from '../common/Modal';
 import { MessagesSkeleton } from '../common/LoadingSkeleton';
-import { EmptyState } from '../common/EmptyState';
-import { Realistic3DIcon } from '../common/Realistic3DIcon';
 import { ForwardModal } from './ForwardModal';
+import { CallModal } from '../calls/CallModal';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -34,7 +38,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onBackMobile,
   onToggleDetails,
 }) => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const {
     activeConversation,
     messages,
@@ -47,6 +51,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     deleteMessage,
     reactToMessage,
     setReplyingTo,
+    setActiveConversationId,
   } = useChat();
 
   const [searchInChat, setSearchInChat] = useState(false);
@@ -58,6 +63,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [viewingMediaName, setViewingMediaName] = useState<string | undefined>(undefined);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
+  // Calling state
+  const [isCallOpen, setIsCallOpen] = useState(false);
+  const [callType, setCallType] = useState<'audio' | 'video'>('audio');
+
+  // Header 3-dots menu
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const chatMenuRef = useRef<HTMLDivElement | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -68,7 +81,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const partnerProfile = partnerId ? userCache[partnerId] : null;
 
   const title = isDirect
-    ? partnerProfile?.displayName || 'Direct Message'
+    ? partnerProfile?.displayName || 'DEV CHAT User'
     : activeConversation?.name || 'Group Chat';
 
   const avatarSrc = isDirect
@@ -94,20 +107,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [(messages || []).length]);
 
+  // Close header menu on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(e.target as Node)) {
+        setShowChatMenu(false);
+      }
+    };
+    if (showChatMenu) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showChatMenu]);
+
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
     const distFromBottom = scrollHeight - scrollTop - clientHeight;
     setShowScrollBottom(distFromBottom > 150);
-  };
-
-  const handleScrollToMessage = (messageId: string) => {
-    const el = document.getElementById(`msg_${messageId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('bg-emerald-500/10');
-      setTimeout(() => el.classList.remove('bg-emerald-500/10'), 1500);
-    }
   };
 
   // Group messages by date
@@ -117,18 +134,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   });
 
   const formatDateHeader = (isoString: string) => {
-    const date = new Date(isoString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const d = new Date(isoString);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return 'TODAY';
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return date.toLocaleDateString(undefined, {
-      month: 'short',
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'YESTERDAY';
+
+    return d.toLocaleDateString([], {
+      weekday: 'long',
+      month: 'long',
       day: 'numeric',
-      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+      year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
     });
+  };
+
+  const handleStartCall = (type: 'audio' | 'video') => {
+    setCallType(type);
+    setIsCallOpen(true);
   };
 
   // Typing indicator text
@@ -143,19 +168,40 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return 'Several people are typing...';
   };
 
+  // WhatsApp Web Welcome Splash Screen
   if (!activeConversation) {
     return (
-      <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#0b141a] p-6 select-none whatsapp-chat-bg text-center">
-        <div className="mb-4">
-          <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
+      <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#222e35] p-8 select-none text-center relative border-b-6 border-[#00a884]">
+        <div className="flex flex-col items-center max-w-md my-auto">
+          {/* Dual Screen Laptop & Phone Illustration */}
+          <div className="relative mb-8 flex items-center justify-center">
+            <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[#111b21] shadow-2xl border border-[#2a3942]">
+              <Laptop className="h-14 w-14 text-[#8696a0]" />
+            </div>
+            <div className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00a884] text-white shadow-xl ring-4 ring-[#222e35]">
+              <Smartphone className="h-6 w-6" />
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-light text-[#e9edef] tracking-wide">
+            Download DEV CHAT for Windows
+          </h2>
+          <p className="mt-3 text-sm text-[#8696a0] leading-relaxed">
+            Make calls, share your screen and get a faster experience when you download the Windows or Web app.
+          </p>
+
+          <button
+            onClick={() => {}}
+            className="mt-6 rounded-full bg-[#00a884] px-6 py-2.5 text-xs font-semibold text-[#111b21] hover:bg-[#06cf9c] transition shadow-lg"
+          >
+            Get DEV CHAT Web
+          </button>
         </div>
-        <h3 className="text-base font-bold text-[#e9edef] mt-2">Chattr for Web & Mobile</h3>
-        <p className="mt-1.5 max-w-sm text-xs text-[#8696a0] leading-relaxed">
-          Send and receive messages in real time with teachers, students, parents, and school staff.
-        </p>
-        <div className="mt-6 flex items-center gap-1.5 text-[11px] text-[#8696a0] bg-[#111b21] px-3.5 py-1.5 rounded-full border border-[#222d34]">
-          <Lock className="h-3 w-3 text-[#25d366]" />
-          <span>Protected with Zero-Trust Firestore Security</span>
+
+        {/* Bottom Lock End-to-end Encrypted */}
+        <div className="mt-auto pb-4 flex items-center gap-1.5 text-xs text-[#8696a0]">
+          <Lock className="h-3.5 w-3.5" />
+          <span>Your personal messages are end-to-end encrypted</span>
         </div>
       </div>
     );
@@ -163,13 +209,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
-      {/* Top Header - WhatsApp Styling */}
-      <div className="flex items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Top Header - Authentic WhatsApp Web Header */}
+      <div className="flex h-15 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 shadow-sm flex-shrink-0">
+        <div className="flex items-center gap-3.5 min-w-0">
           {/* Mobile Back Button */}
           <button
             onClick={onBackMobile}
-            className="md:hidden rounded-xl p-1.5 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+            className="md:hidden rounded-full p-1 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -181,10 +227,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             isOnline={isPartnerOnline}
             showPresence={isDirect}
             className="cursor-pointer"
+            onClick={onToggleDetails}
           />
 
           <div className="min-w-0 cursor-pointer" onClick={onToggleDetails}>
-            <h3 className="text-xs font-bold text-[#e9edef] truncate hover:text-[#25d366] transition-colors">
+            <h3 className="text-sm font-normal text-[#e9edef] truncate hover:underline">
               {title}
             </h3>
             <div className="flex items-center gap-1.5 text-[11px] text-[#8696a0] truncate">
@@ -207,100 +254,162 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </span>
                 )
               ) : (
-                <span>{activeConversation.participantIds.length} members</span>
+                <span>
+                  {activeConversation?.participantIds?.length || 0} members
+                </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Header Actions */}
-        <div className="flex items-center gap-1">
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-2 text-[#aebac1]">
+          {/* Video Call */}
           <button
-            onClick={() => setSearchInChat(!searchInChat)}
-            className={`rounded-xl p-2 transition ${
-              searchInChat
-                ? 'bg-[#005c4b] text-[#25d366]'
-                : 'text-[#8696a0] hover:bg-[#111b21] hover:text-white'
-            }`}
-            title="Search messages in chat"
+            onClick={() => handleStartCall('video')}
+            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            title="Video call"
           >
-            <Search className="h-4 w-4" />
+            <Video className="h-5 w-5" />
           </button>
 
+          {/* Voice Call */}
           <button
-            onClick={onToggleDetails}
-            className="rounded-xl p-2 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
-            title="Conversation details"
+            onClick={() => handleStartCall('audio')}
+            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            title="Voice call"
           >
-            <Info className="h-4 w-4" />
+            <Phone className="h-5 w-5" />
           </button>
+
+          <div className="h-4 w-[1px] bg-[#374248] mx-1" />
+
+          {/* Search in chat */}
+          <button
+            onClick={() => setSearchInChat(!searchInChat)}
+            className={`p-2 rounded-full transition ${
+              searchInChat
+                ? 'bg-[#00a884] text-white'
+                : 'hover:bg-[#374248] hover:text-[#e9edef]'
+            }`}
+            title="Search in chat"
+          >
+            <Search className="h-5 w-5" />
+          </button>
+
+          {/* 3-Dots Menu Dropdown */}
+          <div className="relative" ref={chatMenuRef}>
+            <button
+              onClick={() => setShowChatMenu(!showChatMenu)}
+              className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+              title="Menu"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+
+            {showChatMenu && (
+              <div className="absolute right-0 top-11 z-50 w-48 rounded-2xl border border-[#222d34] bg-[#233138] py-2 shadow-2xl backdrop-blur-md animate-in fade-in">
+                <button
+                  onClick={() => {
+                    setShowChatMenu(false);
+                    onToggleDetails();
+                  }}
+                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  {isDirect ? 'Contact info' : 'Group info'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowChatMenu(false);
+                    setSearchInChat(true);
+                  }}
+                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  Search messages
+                </button>
+                <button
+                  onClick={() => {
+                    setShowChatMenu(false);
+                    setActiveConversationId(null);
+                  }}
+                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  Close chat
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* In-Chat Search Bar */}
+      {/* Inline Search Bar */}
       {searchInChat && (
-        <div className="border-b border-[#222d34] bg-[#202c33] px-4 py-2 flex items-center gap-2 animate-in fade-in">
+        <div className="flex items-center gap-3 border-b border-[#222d34] bg-[#202c33] px-4 py-2 text-xs">
           <Search className="h-4 w-4 text-[#8696a0]" />
           <input
             type="text"
             value={chatSearchTerm}
             onChange={(e) => setChatSearchTerm(e.target.value)}
-            placeholder="Search within this chat..."
-            className="flex-1 bg-transparent text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none"
+            placeholder="Search messages in this chat..."
+            className="flex-1 bg-transparent text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none"
             autoFocus
           />
-          {chatSearchTerm && (
-            <button
-              onClick={() => setChatSearchTerm('')}
-              className="text-xs text-[#8696a0] hover:text-[#e9edef]"
-            >
-              Clear
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setSearchInChat(false);
+              setChatSearchTerm('');
+            }}
+            className="text-[#8696a0] hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {/* Messages Scroll Container with WhatsApp Background */}
+      {/* Messages Scroll Area with WhatsApp Doodle Background */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-1 relative whatsapp-chat-bg"
+        className="flex-1 overflow-y-auto px-4 py-4 whatsapp-chat-bg relative"
       >
+        {/* End-to-end Encryption Yellow/Gold Notice Pill */}
+        <div className="flex justify-center my-3">
+          <div className="max-w-md rounded-lg bg-[#182229] px-4 py-2 text-center text-[11px] text-[#ffd279] shadow-sm flex items-center justify-center gap-1.5 leading-relaxed border border-[#ffd279]/10">
+            <Lock className="h-3 w-3 flex-shrink-0 text-[#ffd279]" />
+            <span>
+              Messages and calls are end-to-end encrypted. No one outside of this chat, not even DEV CHAT, can read or listen to them.
+            </span>
+          </div>
+        </div>
+
         {loadingMessages ? (
-          <MessagesSkeleton />
+          <div className="space-y-4 pt-4">
+            <MessagesSkeleton />
+          </div>
         ) : filteredMessages.length === 0 ? (
-          <EmptyState
-            icon={MessageSquare}
-            title={chatSearchTerm ? 'No messages matched' : 'Start the conversation'}
-            description={
-              chatSearchTerm
-                ? 'Try a different search term.'
-                : 'Send your first message to begin real-time chatting!'
-            }
-            className="pt-20"
-          />
+          <div className="flex h-64 flex-col items-center justify-center text-center text-xs text-[#8696a0]">
+            <span>{chatSearchTerm ? 'No messages match your search' : 'Say hi to start the conversation!'}</span>
+          </div>
         ) : (
-          filteredMessages.map((msg, index) => {
-            const isSelf = msg.senderId === user?.uid;
-            const prevMsg = filteredMessages[index - 1];
-            const isNewDay =
+          filteredMessages.map((msg, idx) => {
+            const prevMsg = filteredMessages[idx - 1];
+            const showDateHeader =
               !prevMsg ||
-              formatDateHeader(msg.createdAt) !== formatDateHeader(prevMsg.createdAt);
+              new Date(msg.createdAt).toDateString() !==
+                new Date(prevMsg.createdAt).toDateString();
 
             return (
               <React.Fragment key={msg.id}>
-                {/* Date separator */}
-                {isNewDay && (
-                  <div className="flex justify-center my-3">
-                    <span className="rounded-full bg-slate-800/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 border border-slate-700/40">
+                {showDateHeader && (
+                  <div className="my-4 flex justify-center sticky top-2 z-10">
+                    <span className="rounded-lg bg-[#182229] px-3 py-1 text-[11px] font-medium text-[#8696a0] shadow-sm uppercase tracking-wider">
                       {formatDateHeader(msg.createdAt)}
                     </span>
                   </div>
                 )}
-
                 <MessageBubble
                   message={msg}
-                  isSelf={isSelf}
+                  isSelf={msg.senderId === user?.uid}
                   isGroup={activeConversation.type === 'group'}
                   userCache={userCache}
                   onReply={(m) => setReplyingTo(m)}
@@ -308,13 +417,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     setEditingMessage(m);
                     setEditText(m.text);
                   }}
-                  onDelete={(id, forEveryone) => deleteMessage(id, forEveryone)}
-                  onReact={(id, emoji) => reactToMessage(id, emoji)}
+                  onDelete={deleteMessage}
+                  onReact={reactToMessage}
                   onOpenMedia={(url, name) => {
                     setViewingMediaUrl(url);
                     setViewingMediaName(name);
                   }}
-                  onScrollToMessage={handleScrollToMessage}
+                  onScrollToMessage={(mid) => {
+                    const el = document.getElementById(`msg_${mid}`);
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
                   onForward={(m) => setForwardingMessage(m)}
                 />
               </React.Fragment>
@@ -324,74 +436,81 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Floating Scroll to Bottom Button */}
+      {/* Scroll to Bottom Floating Button */}
       {showScrollBottom && (
         <button
           onClick={() => scrollToBottom(true)}
-          className="absolute bottom-20 right-6 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 border border-slate-700 text-slate-200 shadow-xl hover:bg-slate-700 hover:text-white transition animate-in fade-in"
+          className="absolute bottom-20 right-6 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-[#202c33] text-[#8696a0] shadow-xl hover:text-white border border-[#222d34] transition hover:scale-105"
           title="Scroll to bottom"
         >
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-5 w-5" />
         </button>
       )}
 
-      {/* Composer */}
+      {/* Message Composer (Bottom Bar) */}
       <MessageComposer
         onSendTextMessage={sendTextMessage}
         onSendFileMessage={sendFileMessage}
       />
 
-      {/* Forward Modal */}
-      <ForwardModal
-        message={forwardingMessage}
-        isOpen={!!forwardingMessage}
-        onClose={() => setForwardingMessage(null)}
-      />
-
-      {/* Edit Message Modal */}
-      {editingMessage && (
-        <Modal
-          isOpen={!!editingMessage}
-          onClose={() => setEditingMessage(null)}
-          title="Edit Message"
-          maxWidth="md"
-        >
-          <div className="space-y-4">
-            <textarea
-              rows={3}
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditingMessage(null)}
-                className="rounded-xl bg-slate-800 px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  if (editText.trim()) {
-                    await editCurrentMessage(editingMessage.id, editText);
-                    setEditingMessage(null);
-                  }
-                }}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Media Viewer Modal */}
+      {/* Modals */}
       <MediaViewerModal
         mediaUrl={viewingMediaUrl}
         fileName={viewingMediaName}
         onClose={() => setViewingMediaUrl(null)}
       />
+
+      <ForwardModal
+        isOpen={!!forwardingMessage}
+        message={forwardingMessage}
+        onClose={() => setForwardingMessage(null)}
+      />
+
+      {/* Calling Modal */}
+      <CallModal
+        isOpen={isCallOpen}
+        onClose={() => setIsCallOpen(false)}
+        contactName={title}
+        contactPhoto={avatarSrc}
+        callType={callType}
+      />
+
+      {/* Edit Message Modal */}
+      <Modal
+        isOpen={!!editingMessage}
+        onClose={() => setEditingMessage(null)}
+        title="Edit message"
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            rows={3}
+            className="w-full rounded-xl border border-[#222d34] bg-[#202c33] p-3 text-xs text-[#e9edef] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setEditingMessage(null)}
+              className="rounded-xl px-4 py-2 text-xs font-semibold text-[#8696a0] hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                if (editingMessage && editText.trim()) {
+                  await editCurrentMessage(editingMessage.id, editText.trim());
+                  setEditingMessage(null);
+                }
+              }}
+              className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-semibold text-white hover:bg-[#009374]"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

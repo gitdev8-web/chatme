@@ -87,7 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Preferences & Settings"
-      subtitle="Configure your Chattr experience"
+      subtitle="Configure your DEV CHAT experience"
       maxWidth="lg"
     >
       <div className="flex flex-col sm:flex-row gap-5 min-h-[380px]">
@@ -251,7 +251,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <h4 className="text-xs font-medium text-slate-200">Browser Push Alerts</h4>
                   <p className="text-[11px] text-slate-400">
-                    Receive alerts when Chattr is in background
+                    Receive alerts when DEV CHAT is in background
                   </p>
                 </div>
                 <button
@@ -298,7 +298,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <h4 className="text-xs font-medium text-slate-200">Sign Out</h4>
                   <p className="text-[11px] text-slate-400">
-                    Log out of your Chattr session on this device
+                    Log out of your DEV CHAT session on this device
                   </p>
                 </div>
                 <button

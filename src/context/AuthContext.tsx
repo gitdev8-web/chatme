@@ -92,10 +92,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newProfile: UserProfile = {
       uid: currentUser.uid,
       email: currentUser.email || '',
-      displayName: currentUser.displayName || 'Chattr User',
+      displayName: currentUser.displayName || 'DEV CHAT User',
       username: defaultUsername || `user_${currentUser.uid.slice(0, 5)}`,
       photoURL: currentUser.photoURL || '',
-      bio: 'Hey there! I am using Chattr.',
+      bio: 'Hey there! I am using DEV CHAT.',
       status: 'Available',
       isOnline: true,
       lastSeen: new Date().toISOString(),
@@ -235,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       displayName: displayName.trim(),
       username: cleanedUsername,
       photoURL: photoURL || '',
-      bio: bio?.trim() || 'Hey there! I am using Chattr.',
+      bio: bio?.trim() || 'Hey there! I am using DEV CHAT.',
       status: 'Available',
       isOnline: true,
       lastSeen: new Date().toISOString(),
@@ -294,10 +294,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const currentProfile = profile || {
       uid: currentUser.uid,
       email: currentUser.email || '',
-      displayName: currentUser.displayName || 'Chattr User',
+      displayName: currentUser.displayName || 'DEV CHAT User',
       username: `user_${currentUser.uid.slice(0, 5)}`,
       photoURL: currentUser.photoURL || '',
-      bio: 'Hey there! I am using Chattr.',
+      bio: 'Hey there! I am using DEV CHAT.',
       status: 'Available',
       isOnline: true,
       lastSeen: new Date().toISOString(),
@@ -349,10 +349,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newProfile: UserProfile = {
       uid: currentUser.uid,
       email: currentUser.email || '',
-      displayName: displayName.trim() || 'Chattr User',
+      displayName: displayName.trim() || 'DEV CHAT User',
       username: cleanedUsername,
       photoURL: photoURL || '',
-      bio: bio?.trim() || 'Hey there! I am using Chattr.',
+      bio: bio?.trim() || 'Hey there! I am using DEV CHAT.',
       status: 'Available',
       isOnline: true,
       lastSeen: new Date().toISOString(),
@@ -371,7 +371,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     Promise.allSettled([
       updateProfile(currentUser, {
-        displayName: displayName.trim() || 'Chattr User',
+        displayName: displayName.trim() || 'DEV CHAT User',
         photoURL: photoURL || '',
       }),
       setDoc(doc(db, 'users', currentUser.uid), newProfile, { merge: true }),
@@ -388,13 +388,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const demoPhoneLogin = async (phoneNumber?: string, testName?: string) => {
     const cred = await signInAnonymously(auth);
     const currentUser = cred.user;
-    const name = testName || 'Chattr Demo User';
+    const name = testName || 'DEV CHAT Developer';
     const num = phoneNumber || '+256700123456';
     const randId = Math.random().toString(36).substring(2, 7);
 
     const demoProfile: UserProfile = {
       uid: currentUser.uid,
-      email: `${randId}@demo.chattr`,
+      email: `${randId}@devchat.app`,
       displayName: name,
       username: `user_${randId}`,
       photoURL: `https://api.dicebear.com/7.x/bottts/svg?seed=${randId}`,
