@@ -5,7 +5,7 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import defaultFirebaseConfig from '../../firebase-applet-config.json';
@@ -50,15 +50,3 @@ if (typeof window !== 'undefined') {
       // Analytics not supported in environment (e.g. iframe restrictions)
     });
 }
-
-// Handshake verification
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline or network is disconnected:', error.message);
-    }
-  }
-}
-testConnection();

@@ -63,7 +63,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const isDirect = activeConversation?.type === 'direct';
   const partnerId = isDirect
-    ? activeConversation.participantIds.find((id) => id !== user?.uid) || user?.uid
+    ? activeConversation?.participantIds?.find((id) => id !== user?.uid) || user?.uid
     : null;
   const partnerProfile = partnerId ? userCache[partnerId] : null;
 
@@ -92,7 +92,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (!showScrollBottom) {
       scrollToBottom(true);
     }
-  }, [messages.length]);
+  }, [(messages || []).length]);
 
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
@@ -111,9 +111,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   // Group messages by date
-  const filteredMessages = messages.filter((m) => {
+  const filteredMessages = (messages || []).filter((m) => {
     if (!chatSearchTerm.trim()) return true;
-    return m.text?.toLowerCase().includes(chatSearchTerm.toLowerCase());
+    return (m.text || '').toLowerCase().includes(chatSearchTerm.toLowerCase());
   });
 
   const formatDateHeader = (isoString: string) => {
@@ -133,12 +133,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Typing indicator text
   const typingText = () => {
-    if (typingUsers.length === 0) return null;
+    if (!typingUsers || typingUsers.length === 0) return null;
     if (typingUsers.length === 1) {
-      return `${typingUsers[0].displayName} is typing...`;
+      return `${typingUsers[0]?.displayName || 'Someone'} is typing...`;
     }
     if (typingUsers.length === 2) {
-      return `${typingUsers[0].displayName} and ${typingUsers[1].displayName} are typing...`;
+      return `${typingUsers[0]?.displayName || 'User'} and ${typingUsers[1]?.displayName || 'User'} are typing...`;
     }
     return 'Several people are typing...';
   };

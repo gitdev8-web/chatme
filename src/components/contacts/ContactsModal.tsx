@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Search, MessageSquare, User, AtSign, Loader2 } from 'lucide-react';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { Search, MessageSquare, Loader2 } from 'lucide-react';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -30,43 +30,62 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   useEffect(() => {
     if (!isOpen) return;
 
+    let isMounted = true;
     const fetchUsers = async () => {
       setLoading(true);
       try {
         const usersRef = collection(db, 'users');
-        let q = query(usersRef, limit(20));
+        const q = query(usersRef, limit(30));
 
         const snap = await getDocs(q);
         const list: UserProfile[] = [];
-        snap.forEach((doc) => {
-          const u = doc.data() as UserProfile;
-          if (u.uid !== user?.uid) {
-            list.push(u);
+        snap.forEach((docSnap) => {
+          const u = docSnap.data() as UserProfile;
+          const uid = u?.uid || docSnap.id;
+          if (uid && uid !== user?.uid) {
+            list.push({
+              ...u,
+              uid,
+              displayName: u?.displayName || 'Chattr User',
+              username: u?.username || `user_${uid.slice(0, 5)}`,
+            });
           }
         });
-        setUsersList(list);
+        if (isMounted) {
+          setUsersList(list);
+        }
       } catch (err) {
-        console.error('Error fetching users:', err);
+        console.warn('Notice fetching users:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchUsers();
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, user]);
 
-  const filteredUsers = usersList.filter((u) => {
+  const filteredUsers = (usersList || []).filter((u) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
+    const dName = (u?.displayName || '').toLowerCase();
+    const uName = (u?.username || '').toLowerCase();
+    const email = (u?.email || '').toLowerCase();
+    const phone = (u?.phoneNumber || '').toLowerCase();
     return (
-      u.displayName.toLowerCase().includes(term) ||
-      u.username.toLowerCase().includes(term) ||
-      (u.email && u.email.toLowerCase().includes(term)) ||
-      (u.phoneNumber && u.phoneNumber.includes(term))
+      dName.includes(term) ||
+      uName.includes(term) ||
+      email.includes(term) ||
+      phone.includes(term)
     );
   });
 
   const handleStartChat = async (targetUid: string) => {
+    if (!targetUid) return;
     setStartingChatUid(targetUid);
     try {
       await startDirectChat(targetUid);
@@ -112,40 +131,43 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
               {searchTerm ? 'No users found matching your search.' : 'No other users found.'}
             </div>
           ) : (
-            filteredUsers.map((u) => (
-              <div
-                key={u.uid}
-                className="flex items-center justify-between p-3 rounded-2xl bg-slate-800/40 hover:bg-slate-800/80 transition border border-slate-800"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Avatar
-                    src={u.photoURL}
-                    name={u.displayName}
-                    size="md"
-                    isOnline={u.showOnlineStatus !== false && u.isOnline}
-                    showPresence={true}
-                  />
-                  <div className="min-w-0 truncate">
-                    <h4 className="text-xs font-semibold text-slate-200 truncate">
-                      {u.displayName}
-                    </h4>
-                    <p className="text-[11px] text-slate-400 truncate">@{u.username}</p>
-                    {u.bio && (
-                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{u.bio}</p>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleStartChat(u.uid)}
-                  disabled={startingChatUid === u.uid}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-md hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 transition"
+            filteredUsers.map((u, index) => {
+              const uniqueKey = u.uid || `user-${u.username || index}`;
+              return (
+                <div
+                  key={uniqueKey}
+                  className="flex items-center justify-between p-3 rounded-2xl bg-slate-800/40 hover:bg-slate-800/80 transition border border-slate-800"
                 >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  <span>{startingChatUid === u.uid ? 'Opening...' : 'Message'}</span>
-                </button>
-              </div>
-            ))
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar
+                      src={u.photoURL}
+                      name={u.displayName || 'User'}
+                      size="md"
+                      isOnline={u.showOnlineStatus !== false && u.isOnline}
+                      showPresence={true}
+                    />
+                    <div className="min-w-0 truncate">
+                      <h4 className="text-xs font-semibold text-slate-200 truncate">
+                        {u.displayName || 'Chattr User'}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 truncate">@{u.username || 'user'}</p>
+                      {u.bio && (
+                        <p className="text-[10px] text-slate-500 truncate mt-0.5">{u.bio}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleStartChat(u.uid)}
+                    disabled={startingChatUid === u.uid}
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-md hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 transition"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>{startingChatUid === u.uid ? 'Opening...' : 'Message'}</span>
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

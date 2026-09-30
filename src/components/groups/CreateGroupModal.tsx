@@ -121,13 +121,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onCl
     }
   };
 
-  const filteredUsers = usersList.filter((u) => {
+  const filteredUsers = (usersList || []).filter((u) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
-    return (
-      u.displayName.toLowerCase().includes(term) ||
-      u.username.toLowerCase().includes(term)
-    );
+    const dName = (u?.displayName || '').toLowerCase();
+    const uName = (u?.username || '').toLowerCase();
+    return dName.includes(term) || uName.includes(term);
   });
 
   return (

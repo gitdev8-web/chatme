@@ -32,17 +32,17 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
 
   if (!message) return null;
 
-  const filteredConversations = conversations.filter((c) => {
+  const filteredConversations = (conversations || []).filter((c) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
-    if (c.type === 'group' && c.name?.toLowerCase().includes(term)) return true;
+    if (c.type === 'group' && (c.name || '').toLowerCase().includes(term)) return true;
 
-    const partnerId = c.participantIds.find((id) => id !== user?.uid);
+    const partnerId = c.participantIds?.find((id) => id !== user?.uid);
     if (partnerId && userCache[partnerId]) {
       const p = userCache[partnerId];
       return (
-        p.displayName.toLowerCase().includes(term) ||
-        p.username.toLowerCase().includes(term)
+        (p?.displayName || '').toLowerCase().includes(term) ||
+        (p?.username || '').toLowerCase().includes(term)
       );
     }
     return false;
