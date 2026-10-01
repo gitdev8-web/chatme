@@ -25,7 +25,12 @@ import {
   MessageType,
   TypingStatus,
   UserProfile,
+  UserStatusStory,
 } from '../types';
+import {
+  subscribeToStatusStories,
+  markStoryAsViewed,
+} from '../services/statusService';
 import {
   createGroupConversation,
   deleteMessageForEveryone,
@@ -54,6 +59,9 @@ interface ChatContextType {
   showChatDetails: boolean;
   activeFilter: 'all' | 'direct' | 'groups' | 'unread' | 'archived';
   uploadProgress: number | null;
+  statusStories: UserStatusStory[];
+  hasUnreadStatuses: boolean;
+  viewStory: (statusId: string) => Promise<void>;
   setActiveConversationId: (id: string | null) => void;
   setReplyingTo: (msg: Message | null) => void;
   setShowChatDetails: (show: boolean) => void;
@@ -95,10 +103,35 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showChatDetails, setShowChatDetails] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'direct' | 'groups' | 'unread' | 'archived'>('all');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [statusStories, setStatusStories] = useState<UserStatusStory[]>([]);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageSoundRef = useRef<string | null>(null);
   const notifiedMsgIdsRef = useRef<Set<string>>(new Set());
+
+  // Global live subscription to status stories across all users
+  useEffect(() => {
+    if (!user) {
+      setStatusStories([]);
+      return;
+    }
+    const unsub = subscribeToStatusStories((list) => {
+      setStatusStories(list);
+    });
+    return () => unsub();
+  }, [user]);
+
+  const hasUnreadStatuses = statusStories.some(
+    (s) => s.userId !== user?.uid && !s.viewedBy?.includes(user?.uid || '')
+  );
+
+  const viewStory = useCallback(
+    async (statusId: string) => {
+      if (!user) return;
+      await markStoryAsViewed(statusId, user.uid);
+    },
+    [user]
+  );
 
   // Helper to fetch and cache user profiles
   const getUserProfile = useCallback(
@@ -594,6 +627,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         showChatDetails,
         activeFilter,
         uploadProgress,
+        statusStories,
+        hasUnreadStatuses,
+        viewStory,
         setActiveConversationId,
         setReplyingTo,
         setShowChatDetails,

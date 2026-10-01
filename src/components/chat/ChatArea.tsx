@@ -28,6 +28,7 @@ import { Modal } from '../common/Modal';
 import { MessagesSkeleton } from '../common/LoadingSkeleton';
 import { ForwardModal } from './ForwardModal';
 import { CallModal } from '../calls/CallModal';
+import { StatusViewerModal } from '../status/StatusViewerModal';
 import { initiateCall } from '../../services/callService';
 import { useToast } from '../common/Toast';
 import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
@@ -49,6 +50,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     messages,
     typingUsers,
     userCache,
+    statusStories,
     loadingMessages,
     sendTextMessage,
     sendFileMessage,
@@ -98,6 +100,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     : activeConversation?.photoURL;
 
   const isPartnerOnline = isDirect ? isUserOnline(partnerProfile) : false;
+
+  const partnerStories = partnerId
+    ? statusStories.filter((s) => s.userId === partnerId)
+    : [];
+  const hasPartnerStatus = partnerStories.length > 0;
+  const [isHeaderStatusViewerOpen, setIsHeaderStatusViewerOpen] = useState(false);
 
   // Auto-scroll to bottom on messages change
   const scrollToBottom = (smooth = true) => {
@@ -276,15 +284,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <ArrowLeft className="h-5 w-5" />
           </button>
 
-          <Avatar
-            src={avatarSrc}
-            name={title}
-            size="md"
-            isOnline={isPartnerOnline}
-            showPresence={isDirect}
-            className="cursor-pointer"
-            onClick={onToggleDetails}
-          />
+          <div
+            className={`p-0.5 rounded-full transition-transform ${
+              hasPartnerStatus
+                ? 'bg-gradient-to-tr from-[#25d366] to-[#00a884] ring-2 ring-[#25d366]/60 cursor-pointer hover:scale-105'
+                : ''
+            }`}
+            onClick={() => {
+              if (hasPartnerStatus) {
+                setIsHeaderStatusViewerOpen(true);
+              } else {
+                onToggleDetails();
+              }
+            }}
+            title={hasPartnerStatus ? `View ${title}'s status story` : undefined}
+          >
+            <Avatar
+              src={avatarSrc}
+              name={title}
+              size="md"
+              isOnline={isPartnerOnline}
+              showPresence={isDirect}
+              className="cursor-pointer"
+            />
+          </div>
 
           <div className="min-w-0 cursor-pointer" onClick={onToggleDetails}>
             <h3 className="text-sm font-normal text-[#e9edef] truncate hover:underline">
@@ -512,6 +535,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         isOpen={!!forwardingMessage}
         message={forwardingMessage}
         onClose={() => setForwardingMessage(null)}
+      />
+
+      {/* Status Viewer Modal from Chat Header */}
+      <StatusViewerModal
+        isOpen={isHeaderStatusViewerOpen}
+        onClose={() => setIsHeaderStatusViewerOpen(false)}
+        stories={partnerStories}
       />
 
       {/* Calling Modal */}

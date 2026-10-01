@@ -31,9 +31,7 @@ interface StatusModalProps {
 
 export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => {
   const { user, profile } = useAuth();
-  const { userCache } = useChat();
-  const [allStories, setAllStories] = useState<UserStatusStory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { userCache, statusStories } = useChat();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createMode, setCreateMode] = useState<'text' | 'image'>('text');
   const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
@@ -41,21 +39,10 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
   const [showViewedSection, setShowViewedSection] = useState(true);
   const [statusSearch, setStatusSearch] = useState('');
 
-  // Subscribe to live statuses
-  useEffect(() => {
-    if (!isOpen) return;
-    setLoading(true);
-    const unsubscribe = subscribeToStatusStories((stories) => {
-      setAllStories(stories);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   // Enrich status stories with latest userCache info
-  const enrichedStories = allStories.map((s) => {
+  const enrichedStories = (statusStories || []).map((s) => {
     const cachedUser = userCache[s.userId];
     if (cachedUser) {
       return {
@@ -217,12 +204,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
               Recent Updates
             </h5>
 
-            {loading ? (
-              <div className="flex items-center justify-center py-6 text-xs text-[#8696a0]">
-                <Loader2 className="h-4 w-4 animate-spin mr-2 text-[#25d366]" />
-                Loading updates...
-              </div>
-            ) : recentGroups.length === 0 ? (
+            {recentGroups.length === 0 ? (
               <div className="py-6 text-center text-xs text-[#8696a0] rounded-2xl bg-[#202c33]/40 border border-[#222d34]/60 p-4 space-y-2">
                 <p>No recent status updates from your contacts.</p>
                 <button

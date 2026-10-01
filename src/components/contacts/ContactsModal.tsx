@@ -12,6 +12,7 @@ import { useChat } from '../../context/ChatContext';
 import { UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { Modal } from '../common/Modal';
+import { StatusViewerModal } from '../status/StatusViewerModal';
 import { isUserOnline } from '../../utils/presenceUtils';
 
 interface ContactsModalProps {
@@ -21,11 +22,13 @@ interface ContactsModalProps {
 
 export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
-  const { startDirectChat } = useChat();
+  const { startDirectChat, statusStories } = useChat();
   const [searchTerm, setSearchTerm] = useState('');
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [startingChatUid, setStartingChatUid] = useState<string | null>(null);
+  const [activeStoriesToView, setActiveStoriesToView] = useState<any[]>([]);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   // Fetch recent users or search
   useEffect(() => {
@@ -134,19 +137,37 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
           ) : (
             filteredUsers.map((u, index) => {
               const uniqueKey = u.uid || `user-${u.username || index}`;
+              const userStories = statusStories.filter((s) => s.userId === u.uid);
+              const hasStories = userStories.length > 0;
+
               return (
                 <div
                   key={uniqueKey}
                   className="flex items-center justify-between p-3 rounded-2xl bg-slate-800/40 hover:bg-slate-800/80 transition border border-slate-800"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <Avatar
-                      src={u.photoURL}
-                      name={u.displayName || 'User'}
-                      size="md"
-                      isOnline={isUserOnline(u)}
-                      showPresence={true}
-                    />
+                    <div
+                      className={`p-0.5 rounded-full ${
+                        hasStories
+                          ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 ring-2 ring-emerald-500/50 cursor-pointer hover:scale-105'
+                          : ''
+                      }`}
+                      onClick={() => {
+                        if (hasStories) {
+                          setActiveStoriesToView(userStories);
+                          setIsViewerOpen(true);
+                        }
+                      }}
+                      title={hasStories ? `View ${u.displayName}'s status update` : undefined}
+                    >
+                      <Avatar
+                        src={u.photoURL}
+                        name={u.displayName || 'User'}
+                        size="md"
+                        isOnline={isUserOnline(u)}
+                        showPresence={true}
+                      />
+                    </div>
                     <div className="min-w-0 truncate">
                       <h4 className="text-xs font-semibold text-slate-200 truncate">
                         {u.displayName || 'DEV CHAT User'}
@@ -172,6 +193,13 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
           )}
         </div>
       </div>
+
+      {/* Story Viewer Modal */}
+      <StatusViewerModal
+        isOpen={isViewerOpen}
+        onClose={() => setIsViewerOpen(false)}
+        stories={activeStoriesToView}
+      />
     </Modal>
   );
 };
