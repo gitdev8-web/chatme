@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
 import { Modal } from '../common/Modal';
+import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -151,6 +152,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 >
                   Reset Password
                 </button>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-medium text-slate-200">Progressive Web App (PWA)</h4>
+                  <p className="text-[11px] text-slate-400">Install DEV CHAT for home screen & offline access</p>
+                </div>
+                <PWAInstallButton />
               </div>
             </div>
           )}

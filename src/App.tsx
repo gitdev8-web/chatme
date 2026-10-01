@@ -23,6 +23,7 @@ import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { IncomingCallModal } from './components/calls/IncomingCallModal';
 import { CallModal } from './components/calls/CallModal';
+import { PWAUpdateToast } from './components/common/PWAUpdateToast';
 import { subscribeToIncomingCalls } from './services/callService';
 import { subscribeToStatusStories } from './services/statusService';
 import { CallSession } from './types';
@@ -328,9 +329,11 @@ const AppContent: React.FC = () => {
     return (
       <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0c1317] text-[#e9edef] select-none p-6">
         <div className="flex flex-col items-center max-w-sm text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-lg mb-6 shadow-[#00a884]/20">
-            <MessageSquare className="h-7 w-7 fill-current" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="DEV CHAT"
+            className="h-16 w-16 rounded-2xl shadow-xl shadow-[#00a884]/25 object-cover border border-[#00a884]/30 mb-6"
+          />
           {/* Authentic WhatsApp loading bar */}
           <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
             <div className="h-full bg-[#00a884] rounded-full animate-pulse w-3/5" />
@@ -368,9 +371,11 @@ const AppContent: React.FC = () => {
     return (
       <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0c1317] text-[#e9edef] select-none p-6">
         <div className="flex flex-col items-center max-w-sm text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-lg mb-6 shadow-[#00a884]/20">
-            <MessageSquare className="h-7 w-7 fill-current" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="DEV CHAT"
+            className="h-16 w-16 rounded-2xl shadow-xl shadow-[#00a884]/25 object-cover border border-[#00a884]/30 mb-6"
+          />
           <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
             <div className="h-full bg-[#00a884] rounded-full animate-pulse w-4/5" />
           </div>
@@ -395,6 +400,7 @@ export default function App() {
     <ToastProvider>
       <AuthProvider>
         <AppContent />
+        <PWAUpdateToast />
       </AuthProvider>
     </ToastProvider>
   );

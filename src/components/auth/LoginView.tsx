@@ -65,9 +65,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
         {/* Brand Header */}
         <div className="text-center mb-7 animate-in fade-in duration-300">
           <div className="inline-flex items-center justify-center mb-3.5">
-            <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-lg shadow-[#00a884]/25">
-              <MessageSquare className="h-7 w-7 fill-current" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="DEV CHAT"
+              className="h-16 w-16 rounded-2xl shadow-xl shadow-[#00a884]/25 object-cover border border-[#00a884]/30"
+            />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             DEV CHAT

@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../common/Avatar';
 import { useToast } from '../common/Toast';
+import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
@@ -103,6 +104,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* PWA Install Banner */}
+            <PWAInstallButton variant="banner" />
 
             {/* Menu Options */}
             <div className="divide-y divide-[#222d34]">

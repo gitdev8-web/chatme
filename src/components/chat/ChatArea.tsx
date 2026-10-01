@@ -237,14 +237,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return (
       <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#222e35] p-8 select-none text-center relative border-b-6 border-[#00a884]">
         <div className="flex flex-col items-center max-w-md my-auto">
-          {/* Dual Screen Laptop & Phone Illustration */}
-          <div className="relative mb-8 flex items-center justify-center">
-            <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[#111b21] shadow-2xl border border-[#2a3942]">
-              <Laptop className="h-14 w-14 text-[#8696a0]" />
-            </div>
-            <div className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00a884] text-white shadow-xl ring-4 ring-[#222e35]">
-              <Smartphone className="h-6 w-6" />
-            </div>
+          {/* DEV CHAT Official Logo */}
+          <div className="relative mb-7 flex items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="DEV CHAT"
+              className="h-28 w-28 rounded-3xl shadow-2xl shadow-[#00a884]/20 border border-[#00a884]/30 object-cover"
+            />
           </div>
 
           <h2 className="text-2xl font-light text-[#e9edef] tracking-wide">

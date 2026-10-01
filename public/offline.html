@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>DEV CHAT — Offline</title>
+    <meta name="theme-color" content="#00a884" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #0c1317;
+        color: #e9edef;
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        overflow: hidden;
+      }
+      .bg-glow {
+        position: fixed;
+        top: 20%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 320px;
+        height: 320px;
+        background: radial-gradient(circle, rgba(0, 168, 132, 0.15) 0%, rgba(12, 19, 23, 0) 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .card {
+        position: relative;
+        z-index: 1;
+        max-width: 420px;
+        width: 100%;
+        background-color: #111b21;
+        border: 1px solid #222d34;
+        border-radius: 20px;
+        padding: 36px 28px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .icon-container {
+        width: 72px;
+        height: 72px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #00a884 0%, #059669 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 25px rgba(0, 168, 132, 0.35);
+        position: relative;
+      }
+      .icon-container svg {
+        width: 36px;
+        height: 36px;
+        color: #111b21;
+      }
+      .offline-badge {
+        position: absolute;
+        bottom: -4px;
+        right: -4px;
+        background-color: #ef4444;
+        border: 3px solid #111b21;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .offline-badge svg {
+        width: 12px;
+        height: 12px;
+        color: white;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 10px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        font-size: 14px;
+        color: #8696a0;
+        line-height: 1.5;
+        margin-bottom: 28px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 13px 20px;
+        background-color: #00a884;
+        color: #111b21;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+      }
+      .btn:hover {
+        background-color: #06cf9c;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(0, 168, 132, 0.3);
+      }
+      .btn:active {
+        transform: translateY(0);
+      }
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 20px;
+        padding: 6px 14px;
+        border-radius: 9999px;
+        background-color: #202c33;
+        font-size: 12px;
+        color: #aebac1;
+      }
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #ef4444;
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+      }
+      .footer-note {
+        margin-top: 24px;
+        font-size: 11px;
+        color: #667781;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-glow"></div>
+    <main class="card" role="main" aria-labelledby="offline-title">
+      <div style="position: relative; margin-bottom: 24px;" aria-hidden="true">
+        <img
+          src="/logo.png"
+          alt="DEV CHAT"
+          style="width: 76px; height: 76px; border-radius: 20px; object-fit: cover; box-shadow: 0 10px 25px rgba(0, 168, 132, 0.35); border: 1px solid rgba(0, 168, 132, 0.4);"
+        />
+        <div class="offline-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </div>
+      </div>
+
+      <h1 id="offline-title">You're offline</h1>
+      <p>DEV CHAT needs an internet connection for live messaging.</p>
+
+      <button id="retry-btn" class="btn" onclick="retryConnection()" aria-label="Try Again to reconnect to DEV CHAT">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>Try Again</span>
+      </button>
+
+      <div class="status-pill">
+        <div class="pulse-dot"></div>
+        <span id="status-text">Waiting for internet connection...</span>
+      </div>
+
+      <div class="footer-note">DEV CHAT • End-to-end encrypted messaging</div>
+    </main>
+
+    <script>
+      function retryConnection() {
+        const btn = document.getElementById('retry-btn');
+        btn.innerHTML = 'Checking connection...';
+        btn.style.opacity = '0.7';
+        btn.disabled = true;
+
+        fetch('/', { method: 'HEAD', cache: 'no-store' })
+          .then(function() {
+            window.location.reload();
+          })
+          .catch(function() {
+            setTimeout(function() {
+              btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Try Again';
+              btn.style.opacity = '1';
+              btn.disabled = false;
+            }, 600);
+          });
+      }
+
+      window.addEventListener('online', function() {
+        document.getElementById('status-text').textContent = 'Back online! Reconnecting...';
+        setTimeout(function() {
+          window.location.reload();
+        }, 500);
+      });
+    </script>
+  </body>
+</html>

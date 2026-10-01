@@ -1,6 +1,6 @@
 {
-  "name": "Chattr",
-  "description": "Modern real-time messaging application with instant messaging, groups, voice notes, media sharing, and presence.",
+  "name": "DEV CHAT",
+  "description": "A modern developer-focused chat application for messaging, collaboration, and communication.",
   "requestFramePermissions": [
     "microphone"
   ],

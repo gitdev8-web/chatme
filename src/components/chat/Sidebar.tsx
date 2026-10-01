@@ -29,6 +29,7 @@ import { ProfileDrawer } from '../profile/ProfileDrawer';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
 import { NewChatDrawer } from '../contacts/NewChatDrawer';
 import { StatusViewerModal } from '../status/StatusViewerModal';
+import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface SidebarProps {
   onOpenStatus: () => void;
@@ -214,6 +215,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <MessageSquarePlus className="h-5 w-5" />
           </button>
 
+          {/* Install DEV CHAT PWA App Button */}
+          <PWAInstallButton compact={true} />
+
           {/* 3-Dots Menu Dropdown */}
           <div className="relative" ref={menuRef}>
             <button
@@ -226,6 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {showMenuDropdown && (
               <div className="absolute right-0 top-11 z-50 w-52 rounded-2xl border border-[#222d34] bg-[#233138] py-2 shadow-2xl backdrop-blur-md animate-in fade-in">
+                <PWAInstallButton variant="menu-item" />
                 <button
                   onClick={() => {
                     setShowMenuDropdown(false);
