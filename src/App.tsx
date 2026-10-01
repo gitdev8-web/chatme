@@ -17,6 +17,7 @@ import { ChatDetailsSidebar } from './components/chat/ChatDetailsSidebar';
 import { ContactsModal } from './components/contacts/ContactsModal';
 import { CreateGroupModal } from './components/groups/CreateGroupModal';
 import { GroupsHubModal } from './components/groups/GroupsHubModal';
+import { CommunitiesPage } from './components/groups/CommunitiesPage';
 import { StatusModal } from './components/status/StatusModal';
 import { StatusPage } from './components/status/StatusPage';
 import { ProfileModal } from './components/profile/ProfileModal';
@@ -155,6 +156,14 @@ const MainChatDashboard: React.FC = () => {
         <div className="flex-1 h-full w-full">
           <StatusPage onBackMobile={() => setActiveBottomTab('chats')} />
         </div>
+      ) : activeBottomTab === 'groups' ? (
+        /* Standalone Communities Page View */
+        <div className="flex-1 h-full w-full">
+          <CommunitiesPage
+            onBackMobile={() => setActiveBottomTab('chats')}
+            onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
+          />
+        </div>
       ) : activeBottomTab === 'settings' ? (
         /* Standalone Settings Page View */
         <div className="flex-1 h-full w-full">
@@ -174,7 +183,7 @@ const MainChatDashboard: React.FC = () => {
           >
             <Sidebar
               onOpenStatus={() => setActiveBottomTab('status')}
-              onOpenGroupsHub={() => setIsGroupsHubOpen(true)}
+              onOpenGroupsHub={() => setActiveBottomTab('groups')}
               onOpenContacts={() => setIsContactsOpen(true)}
               onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
               onOpenSettings={() => setActiveBottomTab('settings')}
