@@ -17,7 +17,7 @@ import {
   Mic,
   FileText,
 } from 'lucide-react';
-import { Conversation, UserProfile } from '../../types';
+import { Conversation, UserProfile, UserStatusStory } from '../../types';
 import { Avatar } from '../common/Avatar';
 import {
   toggleArchiveConversation,
@@ -30,7 +30,9 @@ interface ConversationItemProps {
   isActive: boolean;
   currentUserId: string;
   userCache: Record<string, UserProfile>;
+  userStatusStories?: UserStatusStory[];
   onSelect: (id: string) => void;
+  onViewStatus?: (stories: UserStatusStory[]) => void;
   onDelete?: (id: string) => void;
 }
 
@@ -39,7 +41,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   isActive,
   currentUserId,
   userCache,
+  userStatusStories = [],
   onSelect,
+  onViewStatus,
   onDelete,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -50,6 +54,13 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     ? conversation.participantIds?.find((id) => id !== currentUserId) || currentUserId
     : null;
   const partnerProfile = partnerId ? userCache[partnerId] : null;
+
+  // Check if partner has active status stories
+  const partnerStories = isDirect && partnerId
+    ? userStatusStories.filter((s) => s.userId === partnerId)
+    : [];
+  const hasActiveStatus = partnerStories.length > 0;
+  const hasUnreadStatus = partnerStories.some((s) => !s.viewedBy?.includes(currentUserId));
 
   const title = isDirect
     ? partnerProfile?.displayName || 'DEV CHAT User'
@@ -144,21 +155,40 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           : 'hover:bg-[#202c33]'
       }`}
     >
-      {/* Avatar */}
-      <div className="relative flex-shrink-0">
-        {!isDirect && !avatarSrc ? (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#6a7f8a]/30 text-[#e9edef]">
-            <Users className="h-6 w-6" />
-          </div>
-        ) : (
-          <Avatar
-            src={avatarSrc}
-            name={title}
-            size="md"
-            isOnline={isOnline}
-            showPresence={isDirect}
-          />
-        )}
+      {/* Avatar with optional WhatsApp status ring */}
+      <div
+        className="relative flex-shrink-0"
+        onClick={(e) => {
+          if (hasActiveStatus && onViewStatus) {
+            e.stopPropagation();
+            onViewStatus(partnerStories);
+          }
+        }}
+      >
+        <div
+          className={`p-0.5 rounded-full transition-transform ${
+            hasActiveStatus
+              ? hasUnreadStatus
+                ? 'bg-gradient-to-tr from-[#25d366] to-[#00a884] ring-2 ring-[#25d366]/60 cursor-pointer hover:scale-105'
+                : 'ring-1 ring-[#8696a0]/50 cursor-pointer hover:scale-105'
+              : ''
+          }`}
+          title={hasActiveStatus ? `${title}'s status story` : undefined}
+        >
+          {!isDirect && !avatarSrc ? (
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#6a7f8a]/30 text-[#e9edef]">
+              <Users className="h-6 w-6" />
+            </div>
+          ) : (
+            <Avatar
+              src={avatarSrc}
+              name={title}
+              size="md"
+              isOnline={isOnline}
+              showPresence={isDirect && !hasActiveStatus}
+            />
+          )}
+        </div>
       </div>
 
       {/* Main Content */}

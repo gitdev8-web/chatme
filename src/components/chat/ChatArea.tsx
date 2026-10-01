@@ -167,6 +167,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if ((!targetUid || targetUid === user.uid) && activeConversation?.id?.startsWith('dm_')) {
       targetUid = activeConversation.id.replace('dm_', '').split('_').find((id) => id !== user.uid) || null;
     }
+    if (!targetUid || targetUid === user.uid) {
+      targetUid = activeConversation?.participantIds?.find((id) => id !== user.uid) || null;
+    }
 
     if (!targetUid || targetUid === user.uid) {
       showToast('Cannot call: no recipient contact found', 'error');
@@ -318,11 +321,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         {/* Header Action Buttons */}
-        <div className="flex items-center gap-2 text-[#aebac1]">
+        <div className="flex items-center gap-1 sm:gap-2 text-[#aebac1] flex-shrink-0">
           {/* Video Call */}
           <button
             onClick={() => handleStartCall('video')}
-            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="p-1.5 sm:p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition active:scale-95"
             title="Video call"
           >
             <Video className="h-5 w-5" />
@@ -331,18 +334,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Voice Call */}
           <button
             onClick={() => handleStartCall('audio')}
-            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="p-1.5 sm:p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition active:scale-95"
             title="Voice call"
           >
             <Phone className="h-5 w-5" />
           </button>
 
-          <div className="h-4 w-[1px] bg-[#374248] mx-1" />
+          <div className="hidden sm:block h-4 w-[1px] bg-[#374248] mx-1" />
 
           {/* Search in chat */}
           <button
             onClick={() => setSearchInChat(!searchInChat)}
-            className={`p-2 rounded-full transition ${
+            className={`hidden sm:flex p-2 rounded-full transition ${
               searchInChat
                 ? 'bg-[#00a884] text-white'
                 : 'hover:bg-[#374248] hover:text-[#e9edef]'

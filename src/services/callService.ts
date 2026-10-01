@@ -90,17 +90,18 @@ export function subscribeToIncomingCalls(
     (snap) => {
       if (!snap.empty) {
         const now = Date.now();
-        // Return most recent ringing call created within 60 seconds
+        // Return most recent ringing call created within 5 minutes (prevents clock skew issues)
         const docs = snap.docs
           .map((d) => ({ ...d.data(), id: d.id } as CallSession))
           .filter((c) => {
             if (c.status !== 'ringing') return false;
             const created = new Date(c.createdAt || 0).getTime();
-            return now - created < 60000;
+            // Allow up to 5 minutes tolerance or future clock skew up to 2 minutes
+            return Math.abs(now - created) < 300000;
           });
 
         if (docs.length > 0) {
-          docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          docs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
           onIncomingCall(docs[0]);
           return;
         }

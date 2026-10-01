@@ -80,6 +80,9 @@ export const CallModal: React.FC<CallModalProps> = ({
   const animFrameRef = useRef<number | null>(null);
 
   const processedIceRef = useRef<Set<string>>(new Set());
+  const pendingIceRef = useRef<string[]>([]);
+  const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
+  const pendingAnswerRef = useRef<RTCSessionDescriptionInit | null>(null);
   const offerSetRef = useRef<boolean>(false);
   const answerSetRef = useRef<boolean>(false);
 
@@ -111,6 +114,9 @@ export const CallModal: React.FC<CallModalProps> = ({
       remoteStreamRef.current = null;
     }
     processedIceRef.current.clear();
+    pendingIceRef.current = [];
+    pendingOfferRef.current = null;
+    pendingAnswerRef.current = null;
     offerSetRef.current = false;
     answerSetRef.current = false;
   };
@@ -128,19 +134,43 @@ export const CallModal: React.FC<CallModalProps> = ({
     let isMounted = true;
 
     const setupMedia = async () => {
+      let stream: MediaStream | null = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
           video: callType === 'video' || isVideoEnabled,
           audio: true,
         });
-
-        if (!isMounted) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+      } catch (videoErr) {
+        // Fallback to audio-only if video failed
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch (audioErr) {
+          console.warn('Microphone/camera access restricted, using simulated call connection:', audioErr);
+          // Dummy silent audio stream so peer connection and signaling succeed even without physical mic
+          try {
+            const AudioCtx =
+              window.AudioContext ||
+              (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const dst = ctx.createMediaStreamDestination();
+            osc.connect(dst);
+            osc.start();
+            stream = dst.stream;
+          } catch (ctxErr) {
+            console.warn('AudioContext destination fallback error:', ctxErr);
+          }
         }
+      }
 
+      if (!isMounted) {
+        stream?.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      if (stream) {
         localStreamRef.current = stream;
-        if (localVideoRef.current) {
+        if (localVideoRef.current && stream.getVideoTracks().length > 0) {
           localVideoRef.current.srcObject = stream;
         }
 
@@ -176,8 +206,6 @@ export const CallModal: React.FC<CallModalProps> = ({
 
         // Initialize PeerConnection
         initPeerConnection(stream);
-      } catch (err) {
-        console.warn('Media access warning (fallback mode):', err);
       }
     };
 
@@ -188,6 +216,23 @@ export const CallModal: React.FC<CallModalProps> = ({
       cleanupStreamsAndPeer();
     };
   }, [isOpen, callType]);
+
+  // Flush queued ICE candidates once remote description is set
+  const flushPendingIce = async (pc: RTCPeerConnection) => {
+    if (!pc.remoteDescription) return;
+    while (pendingIceRef.current.length > 0) {
+      const candStr = pendingIceRef.current.shift();
+      if (candStr && !processedIceRef.current.has(candStr)) {
+        processedIceRef.current.add(candStr);
+        try {
+          const candidateInit = JSON.parse(candStr);
+          await pc.addIceCandidate(new RTCIceCandidate(candidateInit));
+        } catch (e) {
+          // Ignore transient candidates
+        }
+      }
+    }
+  };
 
   // WebRTC Peer Connection setup
   const initPeerConnection = (stream: MediaStream) => {
@@ -238,6 +283,35 @@ export const CallModal: React.FC<CallModalProps> = ({
           })
           .catch((err) => console.warn('Error creating offer:', err));
       }
+
+      // If callee already received offer while media was initializing:
+      if (isIncoming && pendingOfferRef.current && !offerSetRef.current) {
+        offerSetRef.current = true;
+        const offer = pendingOfferRef.current;
+        pc.setRemoteDescription(new RTCSessionDescription(offer))
+          .then(() => pc.createAnswer())
+          .then((answer) => pc.setLocalDescription(answer))
+          .then(() => {
+            if (pc.localDescription && callSessionId) {
+              setCallAnswer(callSessionId, {
+                type: pc.localDescription.type,
+                sdp: pc.localDescription.sdp,
+              });
+              answerSetRef.current = true;
+            }
+            return flushPendingIce(pc);
+          })
+          .catch((err) => console.warn('Deferred offer handling notice:', err));
+      }
+
+      // If caller already received answer while media was initializing:
+      if (!isIncoming && pendingAnswerRef.current && !answerSetRef.current) {
+        answerSetRef.current = true;
+        const answer = pendingAnswerRef.current;
+        pc.setRemoteDescription(new RTCSessionDescription(answer))
+          .then(() => flushPendingIce(pc))
+          .catch((err) => console.warn('Deferred answer handling notice:', err));
+      }
     } catch (err) {
       console.warn('WebRTC peer initialization error:', err);
     }
@@ -274,47 +348,63 @@ export const CallModal: React.FC<CallModalProps> = ({
         }
 
         // Callee receives offer: set remote desc and send answer
-        if (isIncoming && session.offer && pc && !offerSetRef.current && pc.signalingState !== 'closed') {
-          try {
-            offerSetRef.current = true;
-            await pc.setRemoteDescription(new RTCSessionDescription(session.offer as RTCSessionDescriptionInit));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            if (pc.localDescription) {
-              await setCallAnswer(callSessionId, {
-                type: pc.localDescription.type,
-                sdp: pc.localDescription.sdp,
-              });
-              answerSetRef.current = true;
+        if (isIncoming && session.offer && !offerSetRef.current) {
+          if (pc && pc.signalingState !== 'closed') {
+            try {
+              offerSetRef.current = true;
+              await pc.setRemoteDescription(new RTCSessionDescription(session.offer as RTCSessionDescriptionInit));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              if (pc.localDescription) {
+                await setCallAnswer(callSessionId, {
+                  type: pc.localDescription.type,
+                  sdp: pc.localDescription.sdp,
+                });
+                answerSetRef.current = true;
+              }
+              await flushPendingIce(pc);
+            } catch (err) {
+              console.warn('Callee setRemoteDescription / answer warning:', err);
             }
-          } catch (err) {
-            console.warn('Callee setRemoteDescription / answer warning:', err);
+          } else {
+            // Queue pending offer to apply as soon as pc finishes initializing
+            pendingOfferRef.current = session.offer as RTCSessionDescriptionInit;
           }
         }
 
         // Caller receives answer: set remote desc
-        if (!isIncoming && session.answer && pc && !answerSetRef.current && pc.signalingState !== 'closed') {
-          try {
-            answerSetRef.current = true;
-            if (pc.signalingState === 'have-local-offer') {
+        if (!isIncoming && session.answer && !answerSetRef.current) {
+          if (pc && pc.signalingState === 'have-local-offer') {
+            try {
+              answerSetRef.current = true;
               await pc.setRemoteDescription(new RTCSessionDescription(session.answer as RTCSessionDescriptionInit));
+              await flushPendingIce(pc);
+            } catch (err) {
+              console.warn('Caller setRemoteDescription warning:', err);
             }
-          } catch (err) {
-            console.warn('Caller setRemoteDescription warning:', err);
+          } else {
+            // Queue pending answer to apply as soon as pc finishes initializing
+            pendingAnswerRef.current = session.answer as RTCSessionDescriptionInit;
           }
         }
 
         // Process remote ICE candidates
         const remoteCandidates = isIncoming ? session.callerIce : session.receiverIce;
-        if (remoteCandidates && Array.isArray(remoteCandidates) && pc) {
+        if (remoteCandidates && Array.isArray(remoteCandidates)) {
           for (const candStr of remoteCandidates) {
             if (!processedIceRef.current.has(candStr)) {
-              processedIceRef.current.add(candStr);
-              try {
-                const candidateInit = JSON.parse(candStr);
-                await pc.addIceCandidate(new RTCIceCandidate(candidateInit));
-              } catch (e) {
-                // Ignore transient candidates before remote description
+              if (pc && pc.remoteDescription && pc.signalingState !== 'closed') {
+                processedIceRef.current.add(candStr);
+                try {
+                  const candidateInit = JSON.parse(candStr);
+                  await pc.addIceCandidate(new RTCIceCandidate(candidateInit));
+                } catch (e) {
+                  // Ignore transient candidates before remote description
+                }
+              } else {
+                if (!pendingIceRef.current.includes(candStr)) {
+                  pendingIceRef.current.push(candStr);
+                }
               }
             }
           }

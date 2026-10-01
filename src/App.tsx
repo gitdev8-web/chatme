@@ -105,11 +105,26 @@ const MainChatDashboard: React.FC = () => {
   // Update browser URL state as user navigates without reloads
   React.useEffect(() => {
     if (activeConversationId) {
-      window.history.replaceState(null, '', `/app/chat/${activeConversationId}`);
+      window.history.pushState({ convId: activeConversationId }, '', `/app/chat/${activeConversationId}`);
     } else {
       window.history.replaceState(null, '', '/app/chats');
     }
   }, [activeConversationId]);
+
+  // Support mobile hardware and browser back button
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/app/chat/')) {
+        const convId = path.replace('/app/chat/', '').trim();
+        setActiveConversationId(convId || null);
+      } else {
+        setActiveConversationId(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [setActiveConversationId]);
 
   // Compute total unread across all chats
   const totalUnread = conversations.reduce((acc, conv) => {

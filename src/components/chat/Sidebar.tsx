@@ -29,6 +29,7 @@ import { UserStatusStory } from '../../types';
 import { ProfileDrawer } from '../profile/ProfileDrawer';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
 import { NewChatDrawer } from '../contacts/NewChatDrawer';
+import { StatusViewerModal } from '../status/StatusViewerModal';
 
 interface SidebarProps {
   onOpenStatus: () => void;
@@ -63,6 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statuses, setStatuses] = useState<UserStatusStory[]>([]);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
+  const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
 
   // WhatsApp Web Slide-over Drawers
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
@@ -391,11 +394,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isActive={conv.id === activeConversationId}
               currentUserId={user?.uid || ''}
               userCache={userCache}
+              userStatusStories={statuses}
+              onViewStatus={(stories) => {
+                setActiveStoryList(stories);
+                setIsStoryViewerOpen(true);
+              }}
               onSelect={() => setActiveConversationId(conv.id)}
             />
           ))
         )}
       </div>
+
+      {/* Story Viewer from Avatar click */}
+      <StatusViewerModal
+        isOpen={isStoryViewerOpen}
+        onClose={() => setIsStoryViewerOpen(false)}
+        stories={activeStoryList}
+      />
     </aside>
   );
 };

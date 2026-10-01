@@ -71,15 +71,19 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     if (!audio) return;
 
     const handleLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
         setTotalDuration(Math.round(audio.duration));
+      } else if (initialDuration && initialDuration > 0) {
+        setTotalDuration(initialDuration);
       }
     };
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
         setTotalDuration(Math.round(audio.duration));
+      } else if (initialDuration && initialDuration > 0) {
+        setTotalDuration(initialDuration);
       }
     };
 
@@ -138,7 +142,11 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     const rect = waveform.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const pct = Math.max(0, Math.min(1, clickX / rect.width));
-    const targetTime = pct * (totalDuration || audio.duration || 1);
+    const maxDur =
+      audio.duration && isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : totalDuration || initialDuration || 1;
+    const targetTime = pct * maxDur;
 
     audio.currentTime = targetTime;
     setCurrentTime(targetTime);

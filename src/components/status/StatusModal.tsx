@@ -183,8 +183,18 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
                 Loading updates...
               </div>
             ) : recentGroups.length === 0 ? (
-              <div className="py-4 text-center text-xs text-[#8696a0] rounded-xl bg-[#202c33]/40 border border-[#222d34]/60">
-                No recent status updates from your contacts.
+              <div className="py-6 text-center text-xs text-[#8696a0] rounded-2xl bg-[#202c33]/40 border border-[#222d34]/60 p-4 space-y-2">
+                <p>No recent status updates from your contacts.</p>
+                <button
+                  onClick={() => {
+                    setCreateMode('text');
+                    setIsCreateOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#00a884] px-3.5 py-1.5 text-xs font-semibold text-[#111b21] hover:bg-[#06cf9c] transition shadow-sm mt-1"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Post your first status</span>
+                </button>
               </div>
             ) : (
               recentGroups.map((g) => {
