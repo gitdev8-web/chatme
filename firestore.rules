@@ -32,9 +32,29 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Admin Audit Logs Collection (Admins can read/create, no deletion or modification to preserve audit integrity)
+    match /admin_audit_logs/{logId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // System Settings Document
+    match /system_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Broadcast Announcements
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Reports Collection
     match /reports/{reportId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     // Status Updates / Stories

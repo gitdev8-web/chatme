@@ -23,7 +23,7 @@ import { StatusPage } from './components/status/StatusPage';
 import { ProfileModal } from './components/profile/ProfileModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { SettingsPage } from './components/settings/SettingsPage';
-import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { IncomingCallModal } from './components/calls/IncomingCallModal';
@@ -54,7 +54,6 @@ const MainChatDashboard: React.FC = () => {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<BottomNavTab>('chats');
 
   // Real-time call states
@@ -102,8 +101,6 @@ const MainChatDashboard: React.FC = () => {
       setIsContactsOpen(true);
     } else if (path === '/app/settings') {
       setIsSettingsOpen(true);
-    } else if (path === '/admin') {
-      setIsAdminOpen(true);
     }
   }, [setActiveConversationId]);
 
@@ -187,7 +184,10 @@ const MainChatDashboard: React.FC = () => {
               onOpenContacts={() => setIsContactsOpen(true)}
               onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
               onOpenSettings={() => setActiveBottomTab('settings')}
-              onOpenAdmin={() => setIsAdminOpen(true)}
+              onOpenAdmin={() => {
+                window.history.pushState(null, '', '/admin');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
               onOpenProfile={() => setIsProfileOpen(true)}
             />
           </div>
@@ -295,12 +295,6 @@ const MainChatDashboard: React.FC = () => {
         onOpenProfile={() => setIsProfileOpen(true)}
       />
 
-      {/* Admin Dashboard */}
-      <AdminDashboardModal
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
-      />
-
       {/* Real-time Incoming Call Modal */}
       <IncomingCallModal
         call={incomingCall}
@@ -329,6 +323,9 @@ const MainChatDashboard: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { user, profile, loading } = useAuth();
+  const [isAdminRoute, setIsAdminRoute] = useState<boolean>(
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')
+  );
   const [authView, setAuthView] = useState<'email-login' | 'email-register'>(
     typeof window !== 'undefined' && window.location.pathname === '/register'
       ? 'email-register'
@@ -336,27 +333,35 @@ const AppContent: React.FC = () => {
   );
 
   React.useEffect(() => {
-    if (!user && !loading) {
+    const handlePopState = () => {
+      setIsAdminRoute(window.location.pathname.startsWith('/admin'));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  React.useEffect(() => {
+    if (!user && !loading && !isAdminRoute) {
       if (window.location.pathname === '/register') {
         setAuthView('email-register');
       } else {
         setAuthView('email-login');
       }
     }
-  }, [user, loading]);
+  }, [user, loading, isAdminRoute]);
 
   React.useEffect(() => {
-    if (!user && !loading) {
+    if (!user && !loading && !isAdminRoute) {
       if (authView === 'email-register') {
         window.history.replaceState(null, '', '/register');
       } else {
         window.history.replaceState(null, '', '/login');
       }
     }
-  }, [authView, user, loading]);
+  }, [authView, user, loading, isAdminRoute]);
 
   React.useEffect(() => {
-    if (user && profile) {
+    if (user && profile && !isAdminRoute) {
       if (
         window.location.pathname === '/login' ||
         window.location.pathname === '/register' ||
@@ -365,7 +370,19 @@ const AppContent: React.FC = () => {
         window.history.replaceState(null, '', '/');
       }
     }
-  }, [user, profile]);
+  }, [user, profile, isAdminRoute]);
+
+  // Admin Dashboard Route handler
+  if (isAdminRoute) {
+    return (
+      <AdminDashboard
+        onReturnToApp={() => {
+          window.history.pushState(null, '', '/');
+          setIsAdminRoute(false);
+        }}
+      />
+    );
+  }
 
   if (loading) {
     return (

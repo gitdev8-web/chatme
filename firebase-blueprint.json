@@ -166,6 +166,56 @@
         "endedAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "callerId", "receiverId", "callType", "status", "createdAt"]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable administrator activity audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "adminId": { "type": "string", "maxLength": 128 },
+        "adminEmail": { "type": "string", "maxLength": 256 },
+        "action": { "type": "string", "maxLength": 100 },
+        "targetType": { "type": "string", "maxLength": 50 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["success", "failure"] }
+      },
+      "required": ["id", "adminId", "action", "timestamp", "status"]
+    },
+    "SystemSetting": {
+      "title": "SystemSetting",
+      "description": "Global application configuration settings",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string", "maxLength": 100 },
+        "maintenanceMode": { "type": "boolean" },
+        "registrationOpen": { "type": "boolean" },
+        "voiceCallsEnabled": { "type": "boolean" },
+        "videoCallsEnabled": { "type": "boolean" },
+        "statusStoriesEnabled": { "type": "boolean" },
+        "maxFileSizeMb": { "type": "number" },
+        "updatedAt": { "type": "string", "maxLength": 64 },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["appName", "updatedAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Platform announcements broadcasted to users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "targetAudience": { "type": "string", "enum": ["all", "active", "specific"] },
+        "priority": { "type": "string", "enum": ["normal", "important", "critical"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "title", "message", "targetAudience", "priority", "createdAt"]
     }
   },
   "firestore": {
@@ -204,6 +254,18 @@
     "/admins/{adminId}": {
       "schema": "Admin",
       "description": "Designated administrator records"
+    },
+    "/admin_audit_logs/{logId}": {
+      "schema": "AdminAuditLog",
+      "description": "Immutable security and moderation audit records"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "SystemSetting",
+      "description": "Global application configuration document"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Broadcast notifications and system announcements"
     }
   }
 }
