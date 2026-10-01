@@ -18,8 +18,10 @@ import { ContactsModal } from './components/contacts/ContactsModal';
 import { CreateGroupModal } from './components/groups/CreateGroupModal';
 import { GroupsHubModal } from './components/groups/GroupsHubModal';
 import { StatusModal } from './components/status/StatusModal';
+import { StatusPage } from './components/status/StatusPage';
 import { ProfileModal } from './components/profile/ProfileModal';
 import { SettingsModal } from './components/settings/SettingsModal';
+import { SettingsPage } from './components/settings/SettingsPage';
 import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
 import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
@@ -136,16 +138,11 @@ const MainChatDashboard: React.FC = () => {
   const handleBottomTabChange = (tab: BottomNavTab) => {
     setActiveBottomTab(tab);
     if (tab === 'chats') {
-      setActiveConversationId(null);
       setActiveFilter('all');
-    } else if (tab === 'status') {
-      setIsStatusOpen(true);
     } else if (tab === 'groups') {
       setIsGroupsHubOpen(true);
     } else if (tab === 'contacts') {
       setIsContactsOpen(true);
-    } else if (tab === 'settings') {
-      setIsSettingsOpen(true);
     }
   };
 
@@ -153,34 +150,52 @@ const MainChatDashboard: React.FC = () => {
     <div className="flex h-[100dvh] w-screen overflow-hidden bg-[#0b141a] text-[#e9edef] antialiased select-none relative">
       <OfflineBanner />
 
-      {/* Sidebar: Visible on desktop or when no chat is active on mobile */}
-      <div
-        className={`${
-          activeConversationId ? 'hidden md:flex' : 'flex'
-        } w-full md:w-80 lg:w-[360px] xl:w-[390px] flex-shrink-0 h-full overflow-hidden`}
-      >
-        <Sidebar
-          onOpenStatus={() => setIsStatusOpen(true)}
-          onOpenGroupsHub={() => setIsGroupsHubOpen(true)}
-          onOpenContacts={() => setIsContactsOpen(true)}
-          onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenAdmin={() => setIsAdminOpen(true)}
-          onOpenProfile={() => setIsProfileOpen(true)}
-        />
-      </div>
+      {/* Standalone Status Page View */}
+      {activeBottomTab === 'status' ? (
+        <div className="flex-1 h-full w-full">
+          <StatusPage onBackMobile={() => setActiveBottomTab('chats')} />
+        </div>
+      ) : activeBottomTab === 'settings' ? (
+        /* Standalone Settings Page View */
+        <div className="flex-1 h-full w-full">
+          <SettingsPage
+            onBackMobile={() => setActiveBottomTab('chats')}
+            onOpenProfile={() => setIsProfileOpen(true)}
+          />
+        </div>
+      ) : (
+        /* Standard Main Chat & Sidebar View */
+        <>
+          {/* Sidebar: Visible on desktop or when no chat is active on mobile */}
+          <div
+            className={`${
+              activeConversationId ? 'hidden md:flex' : 'flex'
+            } w-full md:w-80 lg:w-[360px] xl:w-[390px] flex-shrink-0 h-full overflow-hidden`}
+          >
+            <Sidebar
+              onOpenStatus={() => setActiveBottomTab('status')}
+              onOpenGroupsHub={() => setIsGroupsHubOpen(true)}
+              onOpenContacts={() => setIsContactsOpen(true)}
+              onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
+              onOpenSettings={() => setActiveBottomTab('settings')}
+              onOpenAdmin={() => setIsAdminOpen(true)}
+              onOpenProfile={() => setIsProfileOpen(true)}
+            />
+          </div>
 
-      {/* Active Chat Area: Visible on desktop or when a chat is selected on mobile */}
-      <div
-        className={`${
-          activeConversationId ? 'flex' : 'hidden md:flex'
-        } flex-1 h-full min-w-0 overflow-hidden`}
-      >
-        <ChatArea
-          onBackMobile={() => setActiveConversationId(null)}
-          onToggleDetails={() => setShowChatDetails(!showChatDetails)}
-        />
-      </div>
+          {/* Active Chat Area: Visible on desktop or when a chat is selected on mobile */}
+          <div
+            className={`${
+              activeConversationId ? 'flex' : 'hidden md:flex'
+            } flex-1 h-full min-w-0 overflow-hidden`}
+          >
+            <ChatArea
+              onBackMobile={() => setActiveConversationId(null)}
+              onToggleDetails={() => setShowChatDetails(!showChatDetails)}
+            />
+          </div>
+        </>
+      )}
 
       {/* Right Details Sidebar: Desktop inline + Mobile drawer */}
       {showChatDetails && activeConversation && (

@@ -1,6 +1,6 @@
 {
   "name": "DEV CHAT",
-  "description": "A modern developer-focused chat application for messaging, collaboration, and communication.",
+  "description": "A modern WhatsApp-style developer chat application built by lawrencedev featuring real-time messaging, audio/video calls, status stories, and 3D emojis.",
   "requestFramePermissions": [
     "microphone"
   ],

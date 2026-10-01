@@ -406,6 +406,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
           ))
         )}
+
+        {/* Developer Credit Footer */}
+        <div className="p-3 text-center text-[11px] text-[#8696a0]/80 border-t border-[#222d34]/40 mt-auto">
+          <span>DEV CHAT • Built by <strong className="text-[#00a884]">lawrencedev</strong></span>
+        </div>
       </div>
 
       {/* Story Viewer from Avatar click */}
