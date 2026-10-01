@@ -171,12 +171,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
-        // Periodic presence heartbeat every 45s
+        // Periodic presence heartbeat every 25s while tab is visible
         heartbeatInterval = setInterval(() => {
           if (document.visibilityState === 'visible') {
             updatePresence(true);
           }
-        }, 45000);
+        }, 25000);
       } else {
         setProfile(null);
         setIsAdmin(false);
@@ -204,7 +204,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    const handleFocus = () => {
+      updatePresence(true);
+    };
+
+    const handleBlur = () => {
+      updatePresence(false);
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -212,6 +222,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileUnsub) profileUnsub();
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);

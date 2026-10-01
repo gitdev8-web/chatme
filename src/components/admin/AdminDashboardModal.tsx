@@ -30,6 +30,7 @@ import { useToast } from '../common/Toast';
 import { ModerationReport, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { Modal } from '../common/Modal';
+import { isUserOnline } from '../../utils/presenceUtils';
 
 interface AdminDashboardModalProps {
   isOpen: boolean;
@@ -200,7 +201,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-800 space-y-1">
               <span className="text-[11px] font-medium text-slate-400">Active Online</span>
               <p className="text-2xl font-bold text-emerald-400">
-                {users.filter((u) => u.isOnline).length}
+                {users.filter((u) => isUserOnline(u)).length}
               </p>
               <span className="text-[10px] text-slate-400">Connected now</span>
             </div>
@@ -244,7 +245,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                       src={u.photoURL}
                       name={u.displayName}
                       size="sm"
-                      isOnline={u.isOnline}
+                      isOnline={isUserOnline(u)}
                       showPresence={true}
                     />
                     <div className="min-w-0 truncate">

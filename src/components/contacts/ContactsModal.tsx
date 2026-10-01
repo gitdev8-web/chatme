@@ -12,6 +12,7 @@ import { useChat } from '../../context/ChatContext';
 import { UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { Modal } from '../common/Modal';
+import { isUserOnline } from '../../utils/presenceUtils';
 
 interface ContactsModalProps {
   isOpen: boolean;
@@ -143,7 +144,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
                       src={u.photoURL}
                       name={u.displayName || 'User'}
                       size="md"
-                      isOnline={u.showOnlineStatus !== false && u.isOnline}
+                      isOnline={isUserOnline(u)}
                       showPresence={true}
                     />
                     <div className="min-w-0 truncate">

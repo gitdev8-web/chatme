@@ -32,6 +32,7 @@ import {
   editMessage,
   getOrCreateDirectConversation,
   markConversationAsRead,
+  markMessagesAsDelivered,
   sendMessage,
   setTypingStatus,
   toggleMessageReaction,
@@ -146,13 +147,23 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setConversations(convList);
         setLoadingConversations(false);
 
-        // Preload participant user profiles
+        // Preload participant user profiles and mark unread conversations as delivered
         convList.forEach((conv) => {
           conv.participantIds.forEach((uid) => {
             if (uid !== user.uid && !userCache[uid]) {
               getUserProfile(uid);
             }
           });
+
+          // If conversation has a last message not from self, mark it delivered
+          if (
+            conv.lastMessage &&
+            conv.lastMessage.senderId !== user.uid &&
+            conv.lastMessage.id &&
+            activeConversationId !== conv.id
+          ) {
+            markMessagesAsDelivered(conv.id, user.uid, [conv.lastMessage.id]);
+          }
         });
       },
       (error) => {
@@ -177,6 +188,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoadingMessages(true);
     const msgsRef = collection(db, 'conversations', activeConversationId, 'messages');
     const q = query(msgsRef, orderBy('createdAt', 'asc'), limit(300));
+
+    let currentUnreadIds: string[] = [];
+
+    const markActiveAsReadIfVisible = () => {
+      const isVisible = document.visibilityState === 'visible';
+      const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+
+      if (isVisible && isFocused && currentUnreadIds.length > 0) {
+        markConversationAsRead(activeConversationId, user.uid, currentUnreadIds);
+      } else if (currentUnreadIds.length > 0) {
+        markMessagesAsDelivered(activeConversationId, user.uid, currentUnreadIds);
+      }
+    };
 
     const unsubscribe = onSnapshot(
       q,
@@ -206,12 +230,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMessages(msgs);
         setLoadingMessages(false);
 
-        // Mark as read in real-time
-        const unreadMsgIds = msgs
+        // Filter unread message IDs
+        currentUnreadIds = msgs
           .filter((m) => m.senderId !== user.uid && (!m.readBy || !m.readBy.includes(user.uid)))
           .map((m) => m.id);
 
-        markConversationAsRead(activeConversationId, user.uid, unreadMsgIds);
+        markActiveAsReadIfVisible();
       },
       (error) => {
         handleFirestoreError(
@@ -222,6 +246,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoadingMessages(false);
       }
     );
+
+    const handleWindowFocus = () => {
+      markActiveAsReadIfVisible();
+    };
+
+    const handleVisibility = () => {
+      markActiveAsReadIfVisible();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     // Listen to typing status in active conversation
     const typingRef = collection(db, 'conversations', activeConversationId, 'typing');
@@ -247,6 +282,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       unsubscribe();
       typingUnsub();
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [user, activeConversationId]);
 

@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../common/Avatar';
 import { uploadFileWithProgress } from '../../services/storageService';
 import { useToast } from '../common/Toast';
+import { compressImage } from '../../utils/imageUtils';
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -96,8 +97,14 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
       const file = e.target.files[0];
       setUploadingPhoto(true);
       try {
+        let fileToUpload = file;
+        try {
+          const compressed = await compressImage(file, 512, 0.85);
+          fileToUpload = compressed.file;
+        } catch {}
+
         const res = await uploadFileWithProgress(
-          file,
+          fileToUpload,
           `profiles/${user.uid}`,
           `avatar_${Date.now()}`
         );

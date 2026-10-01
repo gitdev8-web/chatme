@@ -26,6 +26,7 @@ import { Conversation, Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
+import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
 import {
   removeGroupMember,
   toggleGroupAdmin,
@@ -83,9 +84,7 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
     ? partnerProfile?.photoURL
     : conversation.photoURL;
 
-  const isOnline = isDirect
-    ? partnerProfile?.showOnlineStatus !== false && partnerProfile?.isOnline
-    : false;
+  const isOnline = isDirect ? isUserOnline(partnerProfile) : false;
 
   const handleToggleMute = async () => {
     if (!user) return;

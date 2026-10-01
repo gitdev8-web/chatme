@@ -24,6 +24,7 @@ import {
   toggleMuteConversation,
   togglePinConversation,
 } from '../../services/chatService';
+import { isUserOnline } from '../../utils/presenceUtils';
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -70,9 +71,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     ? partnerProfile?.photoURL
     : conversation.photoURL;
 
-  const isOnline = isDirect
-    ? (partnerProfile?.showOnlineStatus !== false && partnerProfile?.isOnline)
-    : false;
+  const isOnline = isDirect ? isUserOnline(partnerProfile) : false;
 
   const isPinned = conversation.pinnedBy?.includes(currentUserId) || false;
   const isMuted = conversation.mutedBy?.includes(currentUserId) || false;

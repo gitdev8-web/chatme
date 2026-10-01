@@ -15,8 +15,10 @@ import {
   Smile,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../common/Toast';
 import { createStatusStory } from '../../services/statusService';
 import { uploadFileWithProgress } from '../../services/storageService';
+import { compressImage } from '../../utils/imageUtils';
 
 const BACKGROUND_COLORS = [
   '#075e54', // WhatsApp Teal
@@ -52,6 +54,7 @@ export const CreateStatusModal: React.FC<CreateStatusModalProps> = ({
   initialMode = 'text',
 }) => {
   const { user, profile } = useAuth();
+  const { showToast } = useToast();
   const [mode, setMode] = useState<'text' | 'image'>(initialMode);
   const [textContent, setTextContent] = useState('');
   const [selectedColor, setSelectedColor] = useState(BACKGROUND_COLORS[0]);
@@ -64,13 +67,19 @@ export const CreateStatusModal: React.FC<CreateStatusModalProps> = ({
 
   if (!isOpen || !user) return null;
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file, 1080, 0.82);
+        setImageFile(compressed.file);
+        setImagePreview(compressed.dataUrl);
+      } catch {
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onload = () => setImagePreview(reader.result as string);
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -93,13 +102,17 @@ export const CreateStatusModal: React.FC<CreateStatusModalProps> = ({
     setLoading(true);
     try {
       let mediaUrl = '';
-      if (mode === 'image' && imageFile) {
-        const uploadRes = await uploadFileWithProgress(
-          imageFile,
-          `statuses/${user.uid}`,
-          imageFile.name
-        );
-        mediaUrl = uploadRes.url || imagePreview || '';
+      if (mode === 'image') {
+        if (imageFile) {
+          const uploadRes = await uploadFileWithProgress(
+            imageFile,
+            `statuses/${user.uid}`,
+            imageFile.name
+          );
+          mediaUrl = uploadRes.url || imagePreview || '';
+        } else if (imagePreview) {
+          mediaUrl = imagePreview;
+        }
       }
 
       await createStatusStory(
@@ -120,10 +133,12 @@ export const CreateStatusModal: React.FC<CreateStatusModalProps> = ({
       setImageFile(null);
       setImagePreview(null);
       setCaption('');
+      showToast('Status published successfully!', 'success');
       onCreated?.();
       onClose();
     } catch (err) {
       console.error('Error posting status:', err);
+      showToast('Could not publish status. Please try again.', 'error');
     } finally {
       setLoading(false);
     }

@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import { UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
+import { isUserOnline } from '../../utils/presenceUtils';
 
 interface NewChatDrawerProps {
   isOpen: boolean;
@@ -183,7 +184,7 @@ export const NewChatDrawer: React.FC<NewChatDrawerProps> = ({
                   src={u.photoURL}
                   name={u.displayName || 'User'}
                   size="md"
-                  isOnline={u.showOnlineStatus !== false && u.isOnline}
+                  isOnline={isUserOnline(u)}
                   showPresence={true}
                 />
                 <div className="min-w-0 flex-1 truncate">

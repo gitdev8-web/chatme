@@ -10,6 +10,7 @@ import { useToast } from '../common/Toast';
 import { Avatar } from '../common/Avatar';
 import { Modal } from '../common/Modal';
 import { uploadFileWithProgress } from '../../services/storageService';
+import { compressImage } from '../../utils/imageUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -64,11 +65,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   };
 
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
+      try {
+        const compressed = await compressImage(file, 512, 0.85);
+        setAvatarFile(compressed.file);
+        setAvatarPreview(compressed.dataUrl);
+      } catch {
+        setAvatarFile(file);
+        setAvatarPreview(URL.createObjectURL(file));
+      }
     }
   };
 

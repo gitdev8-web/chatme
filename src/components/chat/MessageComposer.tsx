@@ -21,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { VoiceRecorderComponent } from './VoiceRecorderComponent';
 import { MediaPreviewModal } from './MediaPreviewModal';
+import { compressImage } from '../../utils/imageUtils';
 
 const EMOJI_LIST = [
   '😀', '😂', '😍', '🔥', '👍', '❤️', '🎉', '🙌',
@@ -95,17 +96,24 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setPendingImageFile(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPendingImagePreview(reader.result as string);
-        setIsMediaPreviewOpen(true);
-      };
-      reader.readAsDataURL(file);
       setShowAttachMenu(false);
+      try {
+        const compressed = await compressImage(file, 1280, 0.85);
+        setPendingImageFile(compressed.file);
+        setPendingImagePreview(compressed.dataUrl);
+        setIsMediaPreviewOpen(true);
+      } catch {
+        setPendingImageFile(file);
+        const reader = new FileReader();
+        reader.onload = () => {
+          setPendingImagePreview(reader.result as string);
+          setIsMediaPreviewOpen(true);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

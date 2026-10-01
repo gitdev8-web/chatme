@@ -30,6 +30,7 @@ import { ForwardModal } from './ForwardModal';
 import { CallModal } from '../calls/CallModal';
 import { initiateCall } from '../../services/callService';
 import { useToast } from '../common/Toast';
+import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -96,9 +97,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     ? partnerProfile?.photoURL
     : activeConversation?.photoURL;
 
-  const isPartnerOnline = isDirect
-    ? (partnerProfile?.showOnlineStatus !== false && partnerProfile?.isOnline)
-    : false;
+  const isPartnerOnline = isDirect ? isUserOnline(partnerProfile) : false;
 
   // Auto-scroll to bottom on messages change
   const scrollToBottom = (smooth = true) => {
@@ -300,15 +299,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 isPartnerOnline ? (
                   <span className="text-[#25d366] font-medium">online</span>
                 ) : (
-                  <span>
-                    last seen{' '}
-                    {partnerProfile?.lastSeen
-                      ? new Date(partnerProfile.lastSeen).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : 'recently'}
-                  </span>
+                  <span>{formatLastSeen(partnerProfile)}</span>
                 )
               ) : (
                 <span>
