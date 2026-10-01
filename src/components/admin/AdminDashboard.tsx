@@ -71,23 +71,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Check current admin role and authorization
   const verifyAdminAccess = useCallback(async () => {
-    if (!user) {
-      setIsAuthorized(false);
-      setCheckingAuth(false);
-      return;
-    }
-
     setCheckingAuth(true);
     try {
-      const result = await getAdminRole(user.uid, user.email || '');
-      setAdminRole(result.role);
-      setIsAuthorized(result.isAuthorized);
+      const isPassVerified = sessionStorage.getItem('admin_authenticated') === 'true';
+      if (isPassVerified) {
+        setAdminRole('SUPER_ADMIN');
+        setIsAuthorized(true);
+      } else {
+        setIsAuthorized(false);
+      }
     } catch {
       setIsAuthorized(false);
     } finally {
       setCheckingAuth(false);
     }
-  }, [user]);
+  }, []);
 
   // Fetch telemetry and records
   const loadAdminData = useCallback(async () => {
@@ -141,7 +139,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   // Not authenticated or unauthorized: render Admin Login
-  if (!user || !isAuthorized) {
+  if (!isAuthorized) {
     return (
       <AdminLoginView
         onSuccess={() => verifyAdminAccess()}

@@ -221,14 +221,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {/* Footer Actions */}
         <div className="p-3 border-t border-[#202c33] space-y-1">
           <button
-            onClick={onReturnToApp}
+            onClick={() => {
+              sessionStorage.removeItem('admin_authenticated');
+              onReturnToApp();
+            }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#8696a0] hover:text-[#e9edef] hover:bg-[#111b21] transition"
           >
             <ArrowLeft className="h-4 w-4 text-[#00a884]" />
             <span>Return to DEV CHAT</span>
           </button>
           <button
-            onClick={logout}
+            onClick={() => {
+              sessionStorage.removeItem('admin_authenticated');
+              window.location.reload();
+            }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition"
           >
             <LogOut className="h-4 w-4" />
@@ -330,14 +336,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
             <div className="pt-3 border-t border-[#202c33] space-y-2">
               <button
-                onClick={onReturnToApp}
+                onClick={() => {
+                  sessionStorage.removeItem('admin_authenticated');
+                  onReturnToApp();
+                }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white bg-[#111b21]"
               >
                 <ArrowLeft className="h-4 w-4 text-[#00a884]" />
                 <span>Return to DEV CHAT</span>
               </button>
               <button
-                onClick={logout}
+                onClick={() => {
+                  sessionStorage.removeItem('admin_authenticated');
+                  window.location.reload();
+                }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 bg-rose-500/10"
               >
                 <LogOut className="h-4 w-4" />
