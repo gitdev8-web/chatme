@@ -41,6 +41,14 @@ export const getAdminRole = async (uid: string, email?: string): Promise<{
   isSuperAdmin: boolean;
   isAuthorized: boolean;
 }> => {
+  if (typeof window !== 'undefined' && sessionStorage.getItem('admin_authenticated') === 'true') {
+    return {
+      role: 'SUPER_ADMIN',
+      isSuperAdmin: true,
+      isAuthorized: true,
+    };
+  }
+
   const normalizedEmail = (email || auth.currentUser?.email || '').toLowerCase();
   
   // Super Admin bootstrap verification

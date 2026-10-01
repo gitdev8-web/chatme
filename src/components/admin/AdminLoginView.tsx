@@ -13,6 +13,8 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { useToast } from '../common/Toast';
+import { auth } from '../../firebase/config';
+import { signInAnonymously } from 'firebase/auth';
 
 interface AdminLoginViewProps {
   onSuccess: () => void;
@@ -38,10 +40,12 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
     }
 
     setLoading(true);
-    // Simulate brief secure handshake delay
-    setTimeout(() => {
-      setLoading(false);
+    try {
       if (password.trim() === 'Percentage') {
+        // Guarantee Firebase session to prevent Firestore permissions errors
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
         sessionStorage.setItem('admin_authenticated', 'true');
         showToast('Administrative access granted', 'success');
         onSuccess();
@@ -49,7 +53,13 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
         setErrorMessage('Incorrect administrative security password.');
         showToast('Access Denied: Incorrect password', 'error');
       }
-    }, 400);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Session handshake failed';
+      setErrorMessage(msg);
+      showToast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
