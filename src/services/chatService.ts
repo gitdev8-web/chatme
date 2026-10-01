@@ -487,6 +487,22 @@ export async function toggleArchiveConversation(
   }
 }
 
+export async function deleteConversationForUser(
+  conversationId: string,
+  currentUid: string
+): Promise<void> {
+  if (!conversationId || !currentUid) return;
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      deletedForUsers: arrayUnion(currentUid),
+      [`unreadCounts.${currentUid}`]: 0,
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `conversations/${conversationId}`);
+  }
+}
+
 export async function updateGroupInfo(
   conversationId: string,
   updates: { name?: string; description?: string; photoURL?: string }

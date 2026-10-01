@@ -182,17 +182,33 @@ const MainChatDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Right Details Sidebar: Desktop toggle */}
+      {/* Right Details Sidebar: Desktop inline + Mobile drawer */}
       {showChatDetails && activeConversation && (
-        <div className="hidden lg:flex h-full">
-          <ChatDetailsSidebar
-            conversation={activeConversation}
-            messages={messages}
-            userCache={userCache}
-            onClose={() => setShowChatDetails(false)}
-            onOpenAddMembers={() => setIsContactsOpen(true)}
-          />
-        </div>
+        <>
+          {/* Desktop inline sidebar */}
+          <div className="hidden lg:flex h-full">
+            <ChatDetailsSidebar
+              conversation={activeConversation}
+              messages={messages}
+              userCache={userCache}
+              onClose={() => setShowChatDetails(false)}
+              onOpenAddMembers={() => setIsContactsOpen(true)}
+            />
+          </div>
+
+          {/* Mobile slide-over modal drawer */}
+          <div className="lg:hidden fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-sm h-full bg-[#111b21] shadow-2xl">
+              <ChatDetailsSidebar
+                conversation={activeConversation}
+                messages={messages}
+                userCache={userCache}
+                onClose={() => setShowChatDetails(false)}
+                onOpenAddMembers={() => setIsContactsOpen(true)}
+              />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Mobile Bottom Navigation */}

@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import { UserStatusStory } from '../../types';
-import { subscribeToStatusStories } from '../../services/statusService';
+import { subscribeToStatusStories, createStatusStory } from '../../services/statusService';
 import { Avatar } from '../common/Avatar';
 import { CreateStatusModal } from './CreateStatusModal';
 import { StatusViewerModal } from './StatusViewerModal';
@@ -163,6 +163,29 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
 
             {/* Quick Actions for My Status */}
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={async () => {
+                  if (user) {
+                    await createStatusStory(
+                      user.uid,
+                      profile?.displayName || 'DEV CHAT Tester',
+                      profile?.photoURL,
+                      'text',
+                      {
+                        text: '🚀 Testing DEV CHAT 3D Emojis 🔥 and Status Updates! ✨',
+                        backgroundColor: '#075e54',
+                        fontFamily: 'sans-serif',
+                      }
+                    );
+                  }
+                }}
+                className="flex items-center gap-1 rounded-full bg-[#00a884]/20 border border-[#00a884]/40 px-2.5 py-1 text-[11px] font-semibold text-[#25d366] hover:bg-[#00a884]/30 transition"
+                title="Publish a sample demo status instantly"
+              >
+                <Sparkles className="h-3 w-3" />
+                <span>Demo Status</span>
+              </button>
+
               <button
                 onClick={() => {
                   setCreateMode('text');

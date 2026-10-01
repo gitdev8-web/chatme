@@ -25,6 +25,7 @@ import {
   togglePinConversation,
 } from '../../services/chatService';
 import { isUserOnline } from '../../utils/presenceUtils';
+import { useChat } from '../../context/ChatContext';
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -47,6 +48,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   onViewStatus,
   onDelete,
 }) => {
+  const { deleteConversation } = useChat();
   const [showMenu, setShowMenu] = useState(false);
 
   // Identify partner for direct conversation
@@ -263,6 +265,20 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           >
             <Pin className="h-3.5 w-3.5 text-[#8696a0]" />
             <span>{isPinned ? 'Unpin chat' : 'Pin chat'}</span>
+          </button>
+
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              setShowMenu(false);
+              if (window.confirm(`Delete chat with ${title}?`)) {
+                await deleteConversation(conversation.id);
+              }
+            }}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-rose-400 hover:bg-[#182229] transition border-t border-[#222d34]/60 mt-1 pt-2"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-rose-400" />
+            <span>Delete chat</span>
           </button>
         </div>
       )}

@@ -25,6 +25,7 @@ import {
 import { Conversation, Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { useAuth } from '../../context/AuthContext';
+import { useChat } from '../../context/ChatContext';
 import { useToast } from '../common/Toast';
 import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
 import {
@@ -50,6 +51,7 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
   onOpenAddMembers,
 }) => {
   const { user, profile, updateProfileData } = useAuth();
+  const { deleteConversation } = useChat();
   const { showToast } = useToast();
   const [activeMediaTab, setActiveMediaTab] = useState<'media' | 'docs'>('media');
   const [isMuted, setIsMuted] = useState(
@@ -326,8 +328,22 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
           </div>
         )}
 
-        {/* Action Buttons: Block / Report */}
+        {/* Action Buttons: Delete Chat / Block / Report */}
         <div className="bg-[#111b21] divide-y divide-[#222d34] border-b border-[#222d34]">
+          <button
+            onClick={async () => {
+              if (window.confirm(`Are you sure you want to delete this chat with ${title}?`)) {
+                await deleteConversation(conversation.id);
+                showToast('Chat deleted', 'info');
+                onClose();
+              }
+            }}
+            className="flex w-full items-center gap-4 px-6 py-3.5 text-xs font-semibold text-rose-500 hover:bg-[#202c33] transition"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Delete Chat</span>
+          </button>
+
           {isDirect && (
             <button
               onClick={handleBlockUser}

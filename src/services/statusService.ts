@@ -61,6 +61,20 @@ export async function createStatusStory(
   }
 }
 
+export const DEMO_STATUS_STORY: UserStatusStory = {
+  id: 'demo_status_devchat_official',
+  userId: 'devchat_team',
+  userName: 'DEV CHAT Official 🚀',
+  userPhotoURL: '/logo.png',
+  type: 'text',
+  text: '✨ Welcome to DEV CHAT! Try our realistic 3D Emojis 🔥, Voice Notes 🎙️, and Status Updates! 💬',
+  backgroundColor: '#075e54',
+  fontFamily: 'sans-serif',
+  createdAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  viewedBy: [],
+};
+
 export function subscribeToStatusStories(
   onUpdate: (stories: UserStatusStory[]) => void
 ): () => void {
@@ -84,13 +98,18 @@ export function subscribeToStatusStories(
         }
       });
 
+      // Always supply demo status if list is empty
+      if (all.length === 0) {
+        all.push(DEMO_STATUS_STORY);
+      }
+
       // Sort newest first
       all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       onUpdate(all);
     },
     (err) => {
       handleFirestoreError(err, OperationType.LIST, 'statuses');
-      onUpdate([]);
+      onUpdate([DEMO_STATUS_STORY]);
     }
   );
 }

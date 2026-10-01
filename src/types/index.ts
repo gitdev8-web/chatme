@@ -50,6 +50,7 @@ export interface Conversation {
   pinnedBy?: string[];
   mutedBy?: string[];
   archivedBy?: string[];
+  deletedForUsers?: string[];
   lastMessage?: LastMessageInfo;
   unreadCounts?: Record<string, number>;
 }

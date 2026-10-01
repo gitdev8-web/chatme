@@ -33,6 +33,7 @@ import {
 } from '../services/statusService';
 import {
   createGroupConversation,
+  deleteConversationForUser,
   deleteMessageForEveryone,
   deleteMessageForMe,
   editMessage,
@@ -82,6 +83,7 @@ interface ChatContextType {
   ) => Promise<void>;
   editCurrentMessage: (messageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string, forEveryone: boolean) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   emitTyping: (isTyping: boolean) => void;
   getUserProfile: (uid: string) => Promise<UserProfile | null>;
@@ -200,8 +202,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       q,
       (snapshot) => {
         const convList: Conversation[] = [];
-        snapshot.forEach((doc) => {
-          convList.push(doc.data() as Conversation);
+        snapshot.forEach((docSnap) => {
+          const item = docSnap.data() as Conversation;
+          if (!item.deletedForUsers?.includes(user.uid)) {
+            convList.push(item);
+          }
         });
 
         // Sort by updatedAt descending
@@ -577,6 +582,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Delete conversation for current user
+  const deleteConversation = async (conversationId: string) => {
+    if (!user || !conversationId) return;
+    await deleteConversationForUser(conversationId, user.uid);
+    if (activeConversationId === conversationId) {
+      setActiveConversationId(null);
+      setShowChatDetails(false);
+    }
+  };
+
   // React to message
   const reactToMessage = async (messageId: string, emoji: string) => {
     if (!user || !activeConversationId) return;
@@ -640,6 +655,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendFileMessage,
         editCurrentMessage,
         deleteMessage,
+        deleteConversation,
         reactToMessage,
         emitTyping,
         getUserProfile,
