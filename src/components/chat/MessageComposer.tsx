@@ -22,6 +22,7 @@ import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { VoiceRecorderComponent } from './VoiceRecorderComponent';
 import { MediaPreviewModal } from './MediaPreviewModal';
 import { compressImage } from '../../utils/imageUtils';
+import { Emoji3DPicker } from '../emoji/Emoji3DPicker';
 
 const EMOJI_LIST = [
   '😀', '😂', '😍', '🔥', '👍', '❤️', '🎉', '🙌',
@@ -189,20 +190,13 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         />
       ) : (
         <div className="flex items-end gap-2">
-          {/* Emoji Picker Popup */}
-          {showEmojiPicker && (
-            <div className="absolute bottom-16 left-4 z-30 grid grid-cols-8 gap-1.5 rounded-2xl border border-[#222d34] bg-[#202c33] p-3 shadow-2xl backdrop-blur-md animate-in fade-in">
-              {EMOJI_LIST.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => handleEmojiClick(emoji)}
-                  className="rounded-lg p-1.5 text-lg hover:bg-[#111b21] hover:scale-120 transition"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 3D Emoji Picker Popup */}
+          <Emoji3DPicker
+            isOpen={showEmojiPicker}
+            onClose={() => setShowEmojiPicker(false)}
+            onSelectEmoji={handleEmojiClick}
+            position={window.innerWidth < 640 ? 'bottom-sheet' : 'bottom-left'}
+          />
 
           {/* Attachment Popup */}
           {showAttachMenu && (

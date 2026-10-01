@@ -26,6 +26,8 @@ import { Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { useToast } from '../common/Toast';
 import { VoiceNotePlayer } from './VoiceNotePlayer';
+import { RenderMessage3DEmojis } from '../emoji/RenderMessage3DEmojis';
+import { Emoji3DImage } from '../emoji/Emoji3DImage';
 
 interface MessageBubbleProps {
   message: Message;
@@ -203,7 +205,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Emoji Bar Picker */}
         {showEmojiPicker && (
           <div
-            className={`absolute -top-16 z-30 flex items-center gap-1.5 rounded-2xl border border-[#222d34] bg-[#233138] p-2 shadow-2xl backdrop-blur-md ${
+            className={`absolute -top-16 z-30 flex items-center gap-2 rounded-2xl border border-[#222d34] bg-[#233138] p-2 shadow-2xl backdrop-blur-md ${
               isSelf ? 'right-0' : 'left-0'
             }`}
           >
@@ -214,9 +216,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   onReact(message.id, emoji);
                   setShowEmojiPicker(false);
                 }}
-                className="text-lg hover:scale-130 transition-transform p-1"
+                className="hover:scale-125 transition-transform p-1 rounded-xl hover:bg-[#111b21]"
               >
-                {emoji}
+                <Emoji3DImage char={emoji} size="lg" />
               </button>
             ))}
           </div>
@@ -324,11 +326,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 />
               )}
 
-              {/* Standard Text Message */}
+              {/* Text Message with 3D Emojis */}
               {message.text && message.type === 'text' && (
-                <p className="text-xs leading-relaxed whitespace-pre-wrap break-words pr-14">
-                  {message.text}
-                </p>
+                <div className="text-xs leading-relaxed whitespace-pre-wrap break-words pr-14">
+                  <RenderMessage3DEmojis text={message.text} />
+                </div>
               )}
             </>
           )}
@@ -367,9 +369,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <button
                 key={emoji}
                 onClick={() => onReact(message.id, emoji)}
-                className="flex items-center gap-1 rounded-full border border-[#222d34] bg-[#202c33] px-1.5 py-0.5 text-xs shadow-sm hover:scale-105 active:scale-95 transition"
+                className="flex items-center gap-1 rounded-full border border-[#222d34] bg-[#202c33] px-2 py-0.5 text-xs shadow-sm hover:scale-105 active:scale-95 transition"
               >
-                <span>{emoji}</span>
+                <Emoji3DImage char={emoji} size="sm" />
                 <span className="text-[10px] font-semibold text-[#8696a0]">
                   {uids.length}
                 </span>
