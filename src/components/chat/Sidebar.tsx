@@ -413,6 +413,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
+      {/* Floating Action Button (FAB) for New Chat */}
+      <button
+        onClick={() => setIsNewChatDrawerOpen(true)}
+        className="absolute right-4 bottom-14 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-2xl hover:bg-[#06cf9c] hover:scale-105 active:scale-95 transition-all duration-200 group ring-4 ring-[#111b21]/60"
+        title="Start New Chat"
+      >
+        <MessageSquarePlus className="h-6 w-6 stroke-[2.5] group-hover:rotate-12 transition-transform" />
+      </button>
+
       {/* Story Viewer from Avatar click */}
       <StatusViewerModal
         isOpen={isStoryViewerOpen}

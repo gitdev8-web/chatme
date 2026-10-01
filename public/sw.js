@@ -12,6 +12,9 @@ const PRECACHE_ASSETS = [
   '/index.html',
   '/offline.html',
   '/manifest.json',
+  '/site.webmanifest',
+  '/manifest.webmanifest',
+  '/.well-known/assetlinks.json',
   '/icon.svg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
@@ -150,6 +153,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.woff') ||
     url.pathname.endsWith('.woff2') ||
     url.pathname.endsWith('.json') ||
+    url.pathname.endsWith('.webmanifest') ||
+    url.pathname.includes('/.well-known/') ||
     url.pathname.includes('/assets/');
 
   if (isStaticAsset) {
@@ -172,7 +177,7 @@ self.addEventListener('fetch', (event) => {
           });
 
         // Return cached version immediately if available, otherwise wait for network
-        return cachedResponse || fetchPromise.then((res) => res || caches.match('/offline.html'));
+        return cachedResponse || fetchPromise.then((res) => res || new Response('Asset Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } }));
       })
     );
     return;

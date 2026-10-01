@@ -2,7 +2,7 @@
   "id": "/",
   "name": "DEV CHAT",
   "short_name": "DEV CHAT",
-  "description": "A modern developer-focused chat application for messaging, collaboration, and communication.",
+  "description": "A modern WhatsApp-style developer chat application built by lawrencedev featuring real-time messaging, audio/video calls, status stories, and 3D emojis.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -66,21 +66,28 @@
       "short_name": "Chats",
       "description": "View recent conversations",
       "url": "/",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Status Updates",
       "short_name": "Status",
       "description": "View 24h status stories",
       "url": "/app/status",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Settings",
       "short_name": "Settings",
       "description": "Adjust account and chat preferences",
       "url": "/app/settings",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=app.vercel.chatme_wine.twa",
+      "id": "app.vercel.chatme_wine.twa"
     }
   ],
   "prefer_related_applications": false

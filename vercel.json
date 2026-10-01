@@ -14,7 +14,7 @@
       ]
     },
     {
-      "source": "/manifest.json",
+      "source": "/(manifest\\.json|site\\.webmanifest|manifest\\.webmanifest)",
       "headers": [
         {
           "key": "Content-Type",
@@ -25,11 +25,24 @@
           "value": "public, max-age=3600, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/\\.well-known/assetlinks\\.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        }
+      ]
     }
   ],
   "rewrites": [
     {
-      "source": "/((?!sw\\.js|manifest\\.json|offline\\.html|.*\\..*).*)",
+      "source": "/((?!sw\\.js|manifest\\.json|site\\.webmanifest|manifest\\.webmanifest|offline\\.html|\\.well-known/.*|.*\\..*).*)",
       "destination": "/index.html"
     }
   ]
