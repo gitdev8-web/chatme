@@ -3,9 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Mic } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Play, Pause, Mic, Loader2, AlertCircle } from 'lucide-react';
 import { Avatar } from '../common/Avatar';
+import {
+  parseAudioUrlToBlob,
+  decodeToUniversalWav,
+  getAudioContext,
+} from '../../utils/audioUtils';
 
 interface VoiceNotePlayerProps {
   messageId: string;
@@ -42,16 +47,104 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
   senderPhoto,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(initialDuration || 0);
   const [speedIndex, setSpeedIndex] = useState(0);
   const [hasPlayed, setHasPlayed] = useState(false);
+  const [resolvedSrc, setResolvedSrc] = useState<string>('');
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+  const fallbackAttemptedRef = useRef<boolean>(false);
   const waveformBars = useRef<number[]>(generateWaveformBars(messageId, 32)).current;
 
-  // Listen to global stop events when another audio starts playing
+  // Clean up Object URLs on unmount or URL change
+  const cleanupObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      try {
+        URL.revokeObjectURL(objectUrlRef.current);
+      } catch {}
+      objectUrlRef.current = null;
+    }
+  }, []);
+
+  // Prepare playable audio source
+  useEffect(() => {
+    fallbackAttemptedRef.current = false;
+    setHasError(false);
+
+    if (!audioUrl) {
+      setResolvedSrc('');
+      return;
+    }
+
+    if (audioUrl.startsWith('data:')) {
+      const blob = parseAudioUrlToBlob(audioUrl);
+      if (blob) {
+        cleanupObjectUrl();
+        const objUrl = URL.createObjectURL(blob);
+        objectUrlRef.current = objUrl;
+        setResolvedSrc(objUrl);
+      } else {
+        setResolvedSrc(audioUrl);
+      }
+    } else {
+      setResolvedSrc(audioUrl);
+    }
+
+    return () => {
+      cleanupObjectUrl();
+    };
+  }, [audioUrl, cleanupObjectUrl]);
+
+  // Handle fallback using Web Audio API conversion to standard WAV
+  const tryFallbackDecoding = useCallback(async (): Promise<boolean> => {
+    if (fallbackAttemptedRef.current) return false;
+    fallbackAttemptedRef.current = true;
+    setIsLoading(true);
+
+    try {
+      let audioBlob: Blob | null = null;
+      if (audioUrl.startsWith('data:')) {
+        audioBlob = parseAudioUrlToBlob(audioUrl);
+      } else {
+        const resp = await fetch(resolvedSrc || audioUrl);
+        audioBlob = await resp.blob();
+      }
+
+      if (!audioBlob) {
+        setIsLoading(false);
+        setHasError(true);
+        return false;
+      }
+
+      const wavBlob = await decodeToUniversalWav(audioBlob);
+      if (wavBlob) {
+        cleanupObjectUrl();
+        const wavUrl = URL.createObjectURL(wavBlob);
+        objectUrlRef.current = wavUrl;
+        setResolvedSrc(wavUrl);
+
+        if (audioRef.current) {
+          audioRef.current.src = wavUrl;
+          audioRef.current.load();
+        }
+        setIsLoading(false);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Fallback audio decoding failed:', err);
+    }
+
+    setIsLoading(false);
+    setHasError(true);
+    return false;
+  }, [audioUrl, resolvedSrc, cleanupObjectUrl]);
+
+  // Listen to global stop events when another voice note starts playing
   useEffect(() => {
     const handleGlobalPause = (e: CustomEvent<{ activeId: string }>) => {
       if (e.detail?.activeId !== messageId && audioRef.current && isPlaying) {
@@ -66,6 +159,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     };
   }, [messageId, isPlaying]);
 
+  // Audio element event bindings
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -82,14 +176,15 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
       setCurrentTime(audio.currentTime);
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
         setTotalDuration(Math.round(audio.duration));
-      } else if (initialDuration && initialDuration > 0) {
-        setTotalDuration(initialDuration);
       }
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
     };
 
     const handlePause = () => {
@@ -99,6 +194,22 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     const handlePlay = () => {
       setIsPlaying(true);
       setHasPlayed(true);
+      setHasError(false);
+    };
+
+    const handleError = async () => {
+      console.warn('Audio tag encountered error, attempting universal WAV fallback...');
+      if (!fallbackAttemptedRef.current) {
+        const recovered = await tryFallbackDecoding();
+        if (recovered && audioRef.current) {
+          try {
+            await audioRef.current.play();
+          } catch {}
+        }
+      } else {
+        setIsPlaying(false);
+        setHasError(true);
+      }
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -106,6 +217,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('play', handlePlay);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -113,12 +225,16 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('error', handleError);
     };
-  }, []);
+  }, [initialDuration, tryFallbackDecoding]);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    // Ensure AudioContext is ready for any web audio operations
+    getAudioContext();
 
     if (isPlaying) {
       audio.pause();
@@ -128,9 +244,23 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
       window.dispatchEvent(
         new CustomEvent('stop-other-audios', { detail: { activeId: messageId } })
       );
-      audio.play().catch((err) => {
-        console.warn('Playback error:', err);
-      });
+
+      try {
+        await audio.play();
+      } catch (err) {
+        console.warn('Direct audio.play() failed, triggering universal decoder fallback:', err);
+        const recovered = await tryFallbackDecoding();
+        if (recovered && audioRef.current) {
+          try {
+            await audioRef.current.play();
+          } catch (playbackErr) {
+            console.error('Final playback attempt failed:', playbackErr);
+            setHasError(true);
+          }
+        } else {
+          setHasError(true);
+        }
+      }
     }
   };
 
@@ -169,13 +299,20 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
   };
 
   // Progress percentage
-  const effectiveDuration = totalDuration || 1;
+  const effectiveDuration = totalDuration || initialDuration || 1;
   const progressPct = Math.min(100, (currentTime / effectiveDuration) * 100);
 
   return (
     <div className="flex items-center gap-2.5 py-1 min-w-[240px] max-w-[320px] select-none">
-      {/* Hidden native audio element */}
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      {/* Native audio element */}
+      {resolvedSrc && (
+        <audio
+          ref={audioRef}
+          src={resolvedSrc}
+          preload="metadata"
+          className="hidden"
+        />
+      )}
 
       {/* Avatar with Mic Indicator */}
       <div className="relative flex-shrink-0">
@@ -198,12 +335,21 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
       {/* Circular Play / Pause Button */}
       <button
         onClick={togglePlay}
-        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white shadow-md transition hover:scale-105 active:scale-95 ${
-          hasPlayed ? 'bg-[#53bdeb] hover:bg-[#3ca9d6]' : 'bg-[#00a884] hover:bg-[#009374]'
+        disabled={isLoading}
+        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white shadow-md transition hover:scale-105 active:scale-95 disabled:opacity-75 ${
+          hasError
+            ? 'bg-rose-600 hover:bg-rose-700'
+            : hasPlayed
+            ? 'bg-[#53bdeb] hover:bg-[#3ca9d6]'
+            : 'bg-[#00a884] hover:bg-[#009374]'
         }`}
-        title={isPlaying ? 'Pause' : 'Play'}
+        title={hasError ? 'Retry playback' : isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? (
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : hasError ? (
+          <AlertCircle className="h-4 w-4" />
+        ) : isPlaying ? (
           <Pause className="h-4 w-4 fill-current" />
         ) : (
           <Play className="h-4 w-4 fill-current ml-0.5" />
@@ -247,7 +393,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
         {/* Bottom Time & Speed Bar */}
         <div className="flex items-center justify-between text-[11px] font-mono leading-none">
           <span className="text-[#8696a0]">
-            {isPlaying ? formatTime(currentTime) : formatTime(totalDuration)}
+            {isPlaying ? formatTime(currentTime) : formatTime(totalDuration || initialDuration || 0)}
           </span>
 
           {/* Speed Toggle Pill */}

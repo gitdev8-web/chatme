@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getAudioContext } from '../utils/audioUtils';
 
 export interface VoiceRecordingState {
   isRecording: boolean;
@@ -13,6 +14,31 @@ export interface VoiceRecordingState {
   hasPermission: boolean | null;
   error: string | null;
   audioLevels: number[];
+}
+
+// Determines the best supported audio MIME type across all browsers
+function detectSupportedMimeType(): { mimeType: string; cleanType: string } {
+  if (typeof MediaRecorder === 'undefined') {
+    return { mimeType: '', cleanType: 'audio/webm' };
+  }
+
+  // Priority order for recording
+  const candidates = [
+    { type: 'audio/webm;codecs=opus', clean: 'audio/webm' },
+    { type: 'audio/mp4', clean: 'audio/mp4' },
+    { type: 'audio/webm', clean: 'audio/webm' },
+    { type: 'audio/ogg;codecs=opus', clean: 'audio/ogg' },
+    { type: 'audio/wav', clean: 'audio/wav' },
+    { type: 'audio/aac', clean: 'audio/aac' },
+  ];
+
+  for (const c of candidates) {
+    if (MediaRecorder.isTypeSupported(c.type)) {
+      return { mimeType: c.type, cleanType: c.clean };
+    }
+  }
+
+  return { mimeType: '', cleanType: 'audio/webm' };
 }
 
 export function useVoiceRecorder() {
@@ -31,9 +57,9 @@ export function useVoiceRecorder() {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const durationRef = useRef<number>(0);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const activeBlobUrlRef = useRef<string | null>(null);
 
   // Clean up audio analyzer
   const cleanupAudioAnalyser = () => {
@@ -41,13 +67,18 @@ export function useVoiceRecorder() {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
+    analyserRef.current = null;
   };
 
   const startRecording = useCallback(async () => {
+    // Revoke previous blob URL if any
+    if (activeBlobUrlRef.current) {
+      try {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      } catch {}
+      activeBlobUrlRef.current = null;
+    }
+
     chunksRef.current = [];
     durationRef.current = 0;
     setState((prev) => ({
@@ -69,14 +100,18 @@ export function useVoiceRecorder() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       streamRef.current = stream;
 
       // Setup Web Audio API analyser for live real waveform levels
       try {
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const audioCtx = new AudioCtx();
-        audioContextRef.current = audioCtx;
+        const audioCtx = getAudioContext();
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 64;
@@ -92,7 +127,6 @@ export function useVoiceRecorder() {
           const step = Math.max(1, Math.floor(dataArray.length / 14));
           for (let i = 0; i < 14; i++) {
             const val = dataArray[i * step] || 0;
-            // Map 0-255 to percentage 15% - 100%
             const pct = Math.max(15, Math.min(100, Math.round((val / 255) * 100)));
             sampledLevels.push(pct);
           }
@@ -104,18 +138,16 @@ export function useVoiceRecorder() {
         console.warn('AudioContext analyser unavailable, falling back:', audioErr);
       }
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : '';
+      const { mimeType } = detectSupportedMimeType();
 
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      const recorderOptions: MediaRecorderOptions = {};
+      if (mimeType) {
+        recorderOptions.mimeType = mimeType;
+      }
+      // 32kbps audio produces lightweight, crisp voice notes
+      recorderOptions.audioBitsPerSecond = 32000;
 
+      const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -172,9 +204,15 @@ export function useVoiceRecorder() {
       }
 
       recorder.onstop = () => {
-        const type = recorder.mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type });
+        const detected = detectSupportedMimeType();
+        const rawType = recorder.mimeType || detected.mimeType || 'audio/webm';
+        // Clean mime type (e.g. "audio/webm;codecs=opus" -> "audio/webm")
+        const cleanType = rawType.split(';')[0].trim() || 'audio/webm';
+
+        const blob = new Blob(chunksRef.current, { type: cleanType });
         const url = URL.createObjectURL(blob);
+        activeBlobUrlRef.current = url;
+
         setState((prev) => ({
           ...prev,
           isRecording: false,
@@ -190,6 +228,13 @@ export function useVoiceRecorder() {
         resolve({ blob, duration });
       };
 
+      try {
+        // Request any remaining audio data before stopping
+        if (recorder.state === 'recording') {
+          recorder.requestData();
+        }
+      } catch {}
+
       recorder.stop();
     });
   }, []);
@@ -197,7 +242,9 @@ export function useVoiceRecorder() {
   const stopRecording = useCallback(() => {
     cleanupAudioAnalyser();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -212,7 +259,9 @@ export function useVoiceRecorder() {
   const cancelRecording = useCallback(() => {
     cleanupAudioAnalyser();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -238,9 +287,16 @@ export function useVoiceRecorder() {
   useEffect(() => {
     return () => {
       cleanupAudioAnalyser();
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (activeBlobUrlRef.current) {
+        try {
+          URL.revokeObjectURL(activeBlobUrlRef.current);
+        } catch {}
       }
     };
   }, []);

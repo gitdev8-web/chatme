@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
+import { getDownloadURL, ref, uploadBytesResumable, UploadMetadata } from 'firebase/storage';
 import { storage } from '../firebase/config';
 
 export interface UploadResult {
@@ -32,16 +32,21 @@ export async function uploadFileWithProgress(
   onProgress?: (progress: number) => void
 ): Promise<UploadResult> {
   const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const cleanMimeType = file.type ? file.type.split(';')[0].trim() : 'application/octet-stream';
+
   const fallbackResult: UploadResult = {
     url: '',
     name: sanitizedName,
     size: file.size,
-    type: file.type,
+    type: cleanMimeType,
   };
 
   try {
     const storageRef = ref(storage, `${path}/${Date.now()}_${sanitizedName}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    const metadata: UploadMetadata = {
+      contentType: cleanMimeType,
+    };
+    const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
     const uploadPromise = new Promise<UploadResult>((resolve, reject) => {
       uploadTask.on(
@@ -82,7 +87,7 @@ export async function uploadFileWithProgress(
       );
     });
 
-    // 3.5s timeout race so offline or unprovisioned storage never hangs the user
+    // 2s timeout race so offline or unprovisioned storage never hangs the user
     const timeoutPromise = new Promise<UploadResult>((resolve) => {
       setTimeout(async () => {
         try {
@@ -97,7 +102,7 @@ export async function uploadFileWithProgress(
             url: '',
           });
         }
-      }, 3500);
+      }, 2000);
     });
 
     return await Promise.race([uploadPromise, timeoutPromise]);
