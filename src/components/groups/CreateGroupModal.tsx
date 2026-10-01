@@ -45,8 +45,16 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onCl
         const snap = await getDocs(query(collection(db, 'users'), limit(50)));
         const list: UserProfile[] = [];
         snap.forEach((doc) => {
-          const u = doc.data() as UserProfile;
-          if (u.uid !== user?.uid) {
+          const data = doc.data() as Partial<UserProfile>;
+          const uId = data.uid || doc.id;
+          const u: UserProfile = {
+            uid: uId,
+            displayName: data.displayName || data.username || 'User',
+            email: data.email || '',
+            username: data.username || (data.displayName || 'user').toLowerCase().replace(/\s+/g, ''),
+            ...data,
+          } as UserProfile;
+          if (u.uid && u.uid !== user?.uid) {
             list.push(u);
           }
         });
@@ -208,12 +216,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onCl
             ) : filteredUsers.length === 0 ? (
               <p className="text-center py-4 text-xs text-slate-500">No users found</p>
             ) : (
-              filteredUsers.map((u) => {
-                const isSelected = selectedUids.includes(u.uid);
+              filteredUsers.map((u, idx) => {
+                const uid = u.uid || `user-${idx}`;
+                const isSelected = selectedUids.includes(uid);
                 return (
                   <div
-                    key={u.uid}
-                    onClick={() => toggleSelectUser(u.uid)}
+                    key={uid}
+                    onClick={() => toggleSelectUser(uid)}
                     className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition select-none ${
                       isSelected
                         ? 'bg-emerald-950/40 border border-emerald-500/30'

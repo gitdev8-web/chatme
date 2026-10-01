@@ -124,8 +124,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (partnerId && userCache[partnerId]) {
         const p = userCache[partnerId];
         return (
-          (p.displayName || '').toLowerCase().includes(q) ||
-          (p.username || '').toLowerCase().includes(q)
+          (p?.displayName || '').toLowerCase().includes(q) ||
+          (p?.username || '').toLowerCase().includes(q)
         );
       }
       return false;

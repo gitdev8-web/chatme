@@ -291,7 +291,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               {title}
             </h3>
             <div className="flex items-center gap-1.5 text-[11px] text-[#8696a0] truncate">
-              {typingUsers.length > 0 ? (
+              {(typingUsers || []).length > 0 ? (
                 <span className="text-[#25d366] font-medium animate-pulse">
                   {typingText()}
                 </span>

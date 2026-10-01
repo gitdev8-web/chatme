@@ -94,7 +94,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // Reactions summary
   const reactionsEntries = Object.entries(message.reactions || {}).filter(
-    ([_, uids]) => uids.length > 0
+    ([_, uids]) => Array.isArray(uids) && uids.length > 0
   );
 
   return (
