@@ -89,7 +89,7 @@ class SoundService {
       const playBurst = () => {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
-        // WhatsApp style melodic double chime
+        // Melodic double chime ringtone
         const notes = [
           { f: 880, start: 0, dur: 0.12 },
           { f: 1046.5, start: 0.14, dur: 0.12 },

@@ -224,14 +224,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4 whatsapp-chat-bg">
+        <div className="flex-1 overflow-y-auto px-4 py-4 devchat-pattern-bg">
           <MessagesSkeleton />
         </div>
       </div>
     );
   }
 
-  // WhatsApp Web Welcome Splash Screen (desktop only when no conversation is selected)
+  // Welcome Splash Screen (desktop only when no conversation is selected)
   if (!activeConversation) {
     return (
       <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#222e35] p-8 select-none text-center relative border-b-6 border-[#00a884]">
@@ -264,7 +264,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
-      {/* Top Header - Authentic WhatsApp Web Header */}
+      {/* Top Header */}
       <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3 sm:px-4 py-2 z-10 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Mobile Back Button */}
@@ -414,11 +414,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      {/* Messages Scroll Area with WhatsApp Doodle Background */}
+      {/* Messages Scroll Area with Chat Background */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4 whatsapp-chat-bg relative"
+        className="flex-1 overflow-y-auto px-4 py-4 devchat-pattern-bg relative"
       >
         {/* End-to-end Encryption Yellow/Gold Notice Pill */}
         <div className="flex justify-center my-3">

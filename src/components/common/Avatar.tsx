@@ -33,7 +33,7 @@ const presenceSizes = {
   '2xl': 'w-5 h-5 right-2 bottom-2 border-2',
 };
 
-// Authentic WhatsApp muted profile avatar backgrounds
+// Profile avatar background color palette
 const bgColors = [
   'bg-[#00a884]',
   'bg-[#128c7e]',

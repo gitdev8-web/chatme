@@ -19,6 +19,9 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeToggle } from '../common/ThemeToggle';
 import { useToast } from '../common/Toast';
 import { Modal } from '../common/Modal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
@@ -29,7 +32,7 @@ interface SettingsModalProps {
   onOpenProfile: () => void;
 }
 
-type TabType = 'account' | 'privacy' | 'notifications' | 'chat' | 'security';
+type TabType = 'account' | 'privacy' | 'theme' | 'notifications' | 'chat' | 'security';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -37,6 +40,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenProfile,
 }) => {
   const { user, profile, updateProfileData, logout, deleteAccount, resetPassword } = useAuth();
+  const { permission, requestPermission } = useNotifications();
+  const { theme } = useTheme();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<TabType>('account');
@@ -97,6 +102,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {[
             { id: 'account', label: 'Account', icon: User },
             { id: 'privacy', label: 'Privacy', icon: Shield },
+            { id: 'theme', label: 'Appearance', icon: Palette },
             { id: 'notifications', label: 'Notifications', icon: Bell },
             { id: 'chat', label: 'Chat', icon: MessageSquare },
             { id: 'security', label: 'Security', icon: Lock },
@@ -243,39 +249,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
+          {/* Appearance / Theme Tab */}
+          {activeTab === 'theme' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-200">Color Theme</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Choose between Dark and Light mode
+                  </p>
+                </div>
+                <ThemeToggle showLabel={true} />
+              </div>
+            </div>
+          )}
+
           {/* Notifications Tab */}
           {activeTab === 'notifications' && (
             <div className="space-y-3">
               <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-medium text-slate-200">In-App Audio Feedback</h4>
+                  <h4 className="text-xs font-medium text-slate-200">In-App Banner Toasts & Sounds</h4>
                   <p className="text-[11px] text-slate-400">
-                    Subtle tones on message send and receive
+                    Real-time floating toasts and audio chimes for incoming messages
                   </p>
                 </div>
-                <span className="text-xs text-emerald-400 font-semibold">Enabled</span>
+                <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                  Active
+                </span>
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-800 flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-medium text-slate-200">Browser Push Alerts</h4>
                   <p className="text-[11px] text-slate-400">
-                    Receive alerts when DEV CHAT is in background
+                    Receive push notifications even when DEV CHAT is in background
                   </p>
                 </div>
-                <button
-                  onClick={async () => {
-                    if ('Notification' in window) {
-                      const res = await Notification.requestPermission();
-                      showToast(`Browser permission: ${res}`, 'info');
-                    } else {
-                      showToast('Notification API not supported by browser', 'error');
-                    }
-                  }}
-                  className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 transition"
-                >
-                  Enable
-                </button>
+                {permission === 'granted' ? (
+                  <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+                    Permission Granted
+                  </span>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const res = await requestPermission();
+                      showToast(`Browser push permission: ${res}`, res === 'granted' ? 'success' : 'info');
+                    }}
+                    className="rounded-xl border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 transition shadow-sm"
+                  >
+                    Enable Push
+                  </button>
+                )}
               </div>
             </div>
           )}

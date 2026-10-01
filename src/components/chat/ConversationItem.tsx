@@ -154,7 +154,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           : 'hover:bg-[#202c33]'
       }`}
     >
-      {/* Avatar with optional WhatsApp status ring */}
+      {/* Avatar with optional status ring */}
       <div
         className="relative flex-shrink-0"
         onClick={(e) => {

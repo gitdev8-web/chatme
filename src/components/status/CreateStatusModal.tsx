@@ -21,7 +21,7 @@ import { uploadFileWithProgress } from '../../services/storageService';
 import { compressImage } from '../../utils/imageUtils';
 
 const BACKGROUND_COLORS = [
-  '#075e54', // WhatsApp Teal
+  '#075e54', // Dark Teal
   '#128c7e', // Emerald
   '#1e3a8a', // Deep Blue
   '#581c87', // Purple

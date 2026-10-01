@@ -71,7 +71,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               isActive ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#d1d7db]'
             }`}
           >
-            {/* Realistic WhatsApp Nav Icon with clean Badge */}
+            {/* Nav Icon with clean Badge */}
             <div className="relative">
               <IconComponent
                 className={`h-5 w-5 transition-transform ${

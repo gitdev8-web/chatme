@@ -4,22 +4,43 @@
  */
 
 import { UserProfile } from '../types';
+import { getCachedPresence } from '../services/presenceService';
 
 /**
  * Presence & Online Status Verification
- * Evaluates whether a user is genuinely currently online based on presence flag and heartbeat freshness.
+ * Evaluates whether a user is genuinely currently online based on real-time presence
+ * and active session heartbeat freshness.
  */
 
-// Max threshold in ms (75 seconds, given a 25-30s client heartbeat)
-const ONLINE_FRESHNESS_THRESHOLD_MS = 75 * 1000;
+// Max threshold in ms (40 seconds, given 15s client session heartbeat)
+const ONLINE_FRESHNESS_THRESHOLD_MS = 40 * 1000;
 
 /**
  * Returns true only if the user has isOnline: true, showOnlineStatus !== false,
- * and their lastSeen timestamp is fresh within the threshold.
+ * and their lastSeen timestamp is fresh within the active heartbeat window.
  */
 export function isUserOnline(profile: UserProfile | null | undefined): boolean {
   if (!profile) return false;
   if (profile.showOnlineStatus === false) return false;
+
+  // 1. Check real-time Firebase RTDB cache if available
+  if (profile.uid) {
+    const cached = getCachedPresence(profile.uid);
+    if (cached) {
+      if (!cached.isOnline || cached.state === 'offline') {
+        return false;
+      }
+      const cachedTime =
+        typeof cached.lastSeen === 'number'
+          ? cached.lastSeen
+          : new Date(cached.lastSeen).getTime();
+      if (!isNaN(cachedTime)) {
+        return Date.now() - cachedTime <= ONLINE_FRESHNESS_THRESHOLD_MS;
+      }
+    }
+  }
+
+  // 2. Check Firestore profile presence flag and timestamp freshness
   if (!profile.isOnline) return false;
   if (!profile.lastSeen) return false;
 
@@ -34,7 +55,7 @@ export function isUserOnline(profile: UserProfile | null | undefined): boolean {
 }
 
 /**
- * Formats a user's last seen time into a human-friendly string like WhatsApp
+ * Formats a user's last seen time into a human-friendly string
  */
 export function formatLastSeen(profile: UserProfile | null | undefined): string {
   if (!profile) return '';

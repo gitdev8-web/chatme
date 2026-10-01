@@ -7,6 +7,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getDatabase, Database } from 'firebase/database';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import defaultFirebaseConfig from '../../firebase-applet-config.json';
 
@@ -16,6 +17,9 @@ const resolvedConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || defaultFirebaseConfig.appId,
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaultFirebaseConfig.apiKey,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultFirebaseConfig.authDomain,
+  databaseURL:
+    import.meta.env.VITE_FIREBASE_DATABASE_URL ||
+    `https://${defaultFirebaseConfig.projectId}-default-rtdb.firebaseio.com`,
   firestoreDatabaseId:
     import.meta.env.VITE_FIREBASE_DATABASE_ID || defaultFirebaseConfig.firestoreDatabaseId || '(default)',
   storageBucket:
@@ -36,6 +40,23 @@ export const db =
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Initialize Firebase Realtime Database with fallback
+export const rtdb: Database | null = (() => {
+  try {
+    if (resolvedConfig.databaseURL) {
+      return getDatabase(app, resolvedConfig.databaseURL);
+    }
+    return getDatabase(app);
+  } catch (err) {
+    console.warn('Realtime database initialization fallback:', err);
+    try {
+      return getDatabase(app);
+    } catch {
+      return null;
+    }
+  }
+})();
 
 // Optional Analytics initialization if supported in current environment
 export let analytics: ReturnType<typeof getAnalytics> | null = null;

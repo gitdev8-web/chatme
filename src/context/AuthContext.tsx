@@ -25,6 +25,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { UserProfile } from '../types';
+import { initializePresence, setUserOnlineState } from '../services/presenceService';
 
 interface AuthContextType {
   user: User | null;
@@ -143,10 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const currentUser = auth.currentUser || user;
     if (!currentUser) return;
     try {
-      await setDoc(doc(db, 'users', currentUser.uid), {
-        isOnline,
-        lastSeen: new Date().toISOString(),
-      }, { merge: true });
+      await setUserOnlineState(currentUser.uid, isOnline);
     } catch {
       // Ignore background presence failures
     }
@@ -154,15 +152,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let profileUnsub: (() => void) | null = null;
-    let heartbeatInterval: NodeJS.Timeout | null = null;
+    let presenceCleanup: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         fetchUserProfile(currentUser).then(() => {
           checkAdminStatus(currentUser);
-          updatePresence(true);
         });
+
+        // Initialize Realtime Presence with Firebase onDisconnect hooks & active session heartbeat
+        if (presenceCleanup) {
+          presenceCleanup();
+        }
+        presenceCleanup = initializePresence(currentUser.uid);
 
         // Real-time listener for current user profile changes
         profileUnsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
@@ -170,61 +173,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setProfile(snap.data() as UserProfile);
           }
         });
-
-        // Periodic presence heartbeat every 25s while tab is visible
-        heartbeatInterval = setInterval(() => {
-          if (document.visibilityState === 'visible') {
-            updatePresence(true);
-          }
-        }, 25000);
       } else {
         setProfile(null);
         setIsAdmin(false);
+        if (presenceCleanup) {
+          presenceCleanup();
+          presenceCleanup = null;
+        }
         if (profileUnsub) {
           profileUnsub();
           profileUnsub = null;
-        }
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-          heartbeatInterval = null;
         }
       }
       setLoading(false);
     });
 
-    const handleBeforeUnload = () => {
-      updatePresence(false);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        updatePresence(true);
-      } else {
-        updatePresence(false);
-      }
-    };
-
-    const handleFocus = () => {
-      updatePresence(true);
-    };
-
-    const handleBlur = () => {
-      updatePresence(false);
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       unsubscribe();
+      if (presenceCleanup) presenceCleanup();
       if (profileUnsub) profileUnsub();
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

@@ -644,7 +644,7 @@ export const CallModal: React.FC<CallModalProps> = ({
           )}
         </div>
 
-        {/* Bottom Control Actions (Authentic WhatsApp Call Dock) */}
+        {/* Bottom Control Actions (Call Dock) */}
         <div className="relative z-30 flex items-center justify-center gap-4 p-5 bg-gradient-to-t from-black/95 to-transparent">
           {/* Mute Mic */}
           <button

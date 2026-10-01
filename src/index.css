@@ -1,27 +1,50 @@
 @import "tailwindcss";
 
-:root {
-  --wa-bg-deep: #0c1317;
-  --wa-bg-chat: #0b141a;
-  --wa-panel-dark: #111b21;
-  --wa-header-dark: #202c33;
-  --wa-hover-dark: #202c33;
-  --wa-active-dark: #2a3942;
-  --wa-input-dark: #202c33;
-  --wa-bubble-outgoing: #005c4b;
-  --wa-bubble-incoming: #202c33;
-  --wa-accent: #25d366;
-  --wa-green-primary: #00a884;
-  --wa-teal: #128c7e;
-  --wa-blue-ticks: #53bdeb;
-  --wa-text-primary: #e9edef;
-  --wa-text-secondary: #8696a0;
-  --wa-border: #222d34;
+:root, [data-theme="dark"] {
+  --chat-bg-deep: #0c1317;
+  --chat-bg-main: #0b141a;
+  --chat-panel-dark: #111b21;
+  --chat-header-dark: #202c33;
+  --chat-hover-dark: #202c33;
+  --chat-active-dark: #2a3942;
+  --chat-input-dark: #202c33;
+  --chat-bubble-outgoing: #005c4b;
+  --chat-bubble-incoming: #202c33;
+  --chat-accent: #25d366;
+  --chat-green-primary: #00a884;
+  --chat-teal: #128c7e;
+  --chat-blue-ticks: #53bdeb;
+  --chat-text-primary: #e9edef;
+  --chat-text-secondary: #8696a0;
+  --chat-border: #222d34;
+  --chat-card-bg: #182229;
+  --chat-modal-bg: #111b21;
+}
+
+[data-theme="light"] {
+  --chat-bg-deep: #e9edef;
+  --chat-bg-main: #efeae2;
+  --chat-panel-dark: #ffffff;
+  --chat-header-dark: #f0f2f5;
+  --chat-hover-dark: #f5f6f6;
+  --chat-active-dark: #e9edef;
+  --chat-input-dark: #ffffff;
+  --chat-bubble-outgoing: #d9fdd3;
+  --chat-bubble-incoming: #ffffff;
+  --chat-accent: #00a884;
+  --chat-green-primary: #00a884;
+  --chat-teal: #128c7e;
+  --chat-blue-ticks: #53bdeb;
+  --chat-text-primary: #111b21;
+  --chat-text-secondary: #667781;
+  --chat-border: #e9edef;
+  --chat-card-bg: #f8f9fa;
+  --chat-modal-bg: #ffffff;
 }
 
 html, body {
-  background-color: var(--wa-bg-deep);
-  color: var(--wa-text-primary);
+  background-color: var(--chat-bg-deep);
+  color: var(--chat-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   -webkit-tap-highlight-color: transparent;
   min-height: 100%;
@@ -29,6 +52,7 @@ html, body {
   overscroll-behavior-y: none;
   overflow-x: hidden;
   max-width: 100vw;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* App-like control selection protection */
@@ -56,17 +80,16 @@ input, textarea {
   padding-right: max(env(safe-area-inset-right, 0px), 0px);
 }
 
-/* WhatsApp chat doodle wallpaper background */
-.whatsapp-chat-bg {
-  background-color: #0b141a;
+/* Chat pattern wallpaper background */
+.devchat-pattern-bg {
+  background-color: var(--chat-bg-main);
   background-image: 
     radial-gradient(circle at 50% 50%, rgba(37, 211, 102, 0.035) 0%, transparent 80%),
     radial-gradient(circle at 10% 20%, rgba(83, 189, 235, 0.02) 0%, transparent 60%),
-    linear-gradient(rgba(11, 20, 26, 0.94), rgba(11, 20, 26, 0.94)),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0, rgba(255, 255, 255, 0.015) 1px, transparent 0, transparent 40px);
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.02) 0, rgba(0, 0, 0, 0.02) 1px, transparent 0, transparent 40px);
 }
 
-/* WhatsApp message speech bubble tails */
+/* Message speech bubble tails */
 .bubble-outgoing-tail::after {
   content: "";
   position: absolute;
@@ -74,7 +97,7 @@ input, textarea {
   right: -8px;
   width: 0;
   height: 0;
-  border-top: 10px solid #005c4b;
+  border-top: 10px solid var(--chat-bubble-outgoing);
   border-right: 10px solid transparent;
 }
 
@@ -85,11 +108,11 @@ input, textarea {
   left: -8px;
   width: 0;
   height: 0;
-  border-top: 10px solid #202c33;
+  border-top: 10px solid var(--chat-bubble-incoming);
   border-left: 10px solid transparent;
 }
 
-/* Custom sleek WhatsApp scrollbar */
+/* Custom sleek scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

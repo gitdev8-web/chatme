@@ -17,6 +17,7 @@ import {
 import { db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 import { sound } from '../hooks/useSound';
 import {
   Conversation,
@@ -38,6 +39,7 @@ import {
   toggleMessageReaction,
 } from '../services/chatService';
 import { uploadFileWithProgress } from '../services/storageService';
+import { subscribeToAllPresence } from '../services/presenceService';
 
 interface ChatContextType {
   conversations: Conversation[];
@@ -81,6 +83,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile } = useAuth();
+  const { notify } = useNotifications();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -95,6 +98,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageSoundRef = useRef<string | null>(null);
+  const notifiedMsgIdsRef = useRef<Set<string>>(new Set());
 
   // Helper to fetch and cache user profiles
   const getUserProfile = useCallback(
@@ -114,6 +118,36 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     [userCache]
   );
+
+  // Real-time presence listener to keep userCache states instantly synchronized
+  useEffect(() => {
+    const unsubPresence = subscribeToAllPresence((presenceMap) => {
+      setUserCache((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        Object.keys(presenceMap).forEach((uid) => {
+          if (next[uid]) {
+            const p = presenceMap[uid];
+            const pTime =
+              typeof p.lastSeen === 'number'
+                ? new Date(p.lastSeen).toISOString()
+                : p.lastSeen;
+            if (next[uid].isOnline !== p.isOnline || next[uid].lastSeen !== pTime) {
+              next[uid] = {
+                ...next[uid],
+                isOnline: p.isOnline,
+                lastSeen: pTime,
+              };
+              changed = true;
+            }
+          }
+        });
+        return changed ? next : prev;
+      });
+    });
+
+    return () => unsubPresence();
+  }, []);
 
   // Listen to conversations for current user
   useEffect(() => {
@@ -155,14 +189,37 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           });
 
-          // If conversation has a last message not from self, mark it delivered
+          // If conversation has a last message not from self, mark it delivered and dispatch notification
           if (
             conv.lastMessage &&
             conv.lastMessage.senderId !== user.uid &&
-            conv.lastMessage.id &&
-            activeConversationId !== conv.id
+            conv.lastMessage.id
           ) {
-            markMessagesAsDelivered(conv.id, user.uid, [conv.lastMessage.id]);
+            if (activeConversationId !== conv.id) {
+              markMessagesAsDelivered(conv.id, user.uid, [conv.lastMessage.id]);
+            }
+
+            // Trigger notification if message has not been notified yet
+            if (!notifiedMsgIdsRef.current.has(conv.lastMessage.id)) {
+              notifiedMsgIdsRef.current.add(conv.lastMessage.id);
+
+              // Get sender details
+              const senderId = conv.lastMessage.senderId;
+              const sender = userCache[senderId];
+              const senderName =
+                conv.type === 'group'
+                  ? `${sender?.displayName || 'Someone'} in ${conv.name}`
+                  : sender?.displayName || 'DEV CHAT User';
+              const senderIcon = sender?.photoURL || conv.photoURL;
+
+              notify({
+                title: senderName,
+                body: conv.lastMessage.text || 'Sent an attachment',
+                icon: senderIcon,
+                conversationId: conv.id,
+                onClick: () => setActiveConversationId(conv.id),
+              });
+            }
           }
         });
       },

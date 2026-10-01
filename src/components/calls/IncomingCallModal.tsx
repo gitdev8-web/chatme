@@ -72,7 +72,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
           {call.callerName}
         </h3>
         <p className="text-xs text-[#8696a0] mt-1 font-normal">
-          WhatsApp {call.callType === 'video' ? 'video' : 'voice'} call...
+          Incoming {call.callType === 'video' ? 'video' : 'voice'} call...
         </p>
 
         {/* Action Controls */}

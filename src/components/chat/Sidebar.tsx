@@ -30,6 +30,7 @@ import { SettingsDrawer } from '../settings/SettingsDrawer';
 import { NewChatDrawer } from '../contacts/NewChatDrawer';
 import { StatusViewerModal } from '../status/StatusViewerModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
+import { ThemeToggle } from '../common/ThemeToggle';
 
 interface SidebarProps {
   onOpenStatus: () => void;
@@ -67,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
 
-  // WhatsApp Web Slide-over Drawers
+  // Slide-over Drawers
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
   const [isNewChatDrawerOpen, setIsNewChatDrawerOpen] = useState(false);
@@ -144,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className="relative flex h-full w-full flex-col border-r border-[#222d34] bg-[#111b21] select-none overflow-hidden">
-      {/* WhatsApp Web Left Slide-over Drawers */}
+      {/* Left Slide-over Drawers */}
       <ProfileDrawer
         isOpen={isProfileDrawerOpen}
         onClose={() => setIsProfileDrawerOpen(false)}
@@ -166,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
       />
 
-      {/* Top Header - Authentic WhatsApp Web Header */}
+      {/* Top Header */}
       <div className="flex h-15 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 flex-shrink-0">
         {/* User Profile Avatar */}
         <div
@@ -183,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        {/* WhatsApp Web Right Action Icons */}
+        {/* Right Action Icons */}
         <div className="flex items-center gap-2 text-[#aebac1]">
           {/* Communities / Groups */}
           <button
@@ -215,6 +216,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <MessageSquarePlus className="h-5 w-5" />
           </button>
 
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           {/* Install DEV CHAT PWA App Button */}
           <PWAInstallButton compact={true} />
 
@@ -231,6 +235,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {showMenuDropdown && (
               <div className="absolute right-0 top-11 z-50 w-52 rounded-2xl border border-[#222d34] bg-[#233138] py-2 shadow-2xl backdrop-blur-md animate-in fade-in">
                 <PWAInstallButton variant="menu-item" />
+                <div className="px-4 py-2 flex items-center justify-between border-b border-[#222d34]/60">
+                  <span className="text-xs text-[#d1d7db]">Theme</span>
+                  <ThemeToggle />
+                </div>
                 <button
                   onClick={() => {
                     setShowMenuDropdown(false);
@@ -294,7 +302,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Search Bar & Filter Unread Toggle */}
+      {/* Search Bar & Filter Unread Toggle */}
       <div className="p-3 border-b border-[#222d34]/60 bg-[#111b21] flex items-center gap-2 flex-shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
@@ -307,7 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        {/* WhatsApp Unread Filter Button */}
+        {/* Unread Filter Button */}
         <button
           onClick={() =>
             setActiveFilter(activeFilter === 'unread' ? 'all' : 'unread')
@@ -323,7 +331,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* Filter Tabs - WhatsApp Style Pills */}
+      {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto no-scrollbar border-b border-[#222d34]/40 flex-shrink-0">
         {[
           { id: 'all', label: 'All' },

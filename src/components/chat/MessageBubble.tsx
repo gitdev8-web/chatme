@@ -222,7 +222,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
 
-        {/* Authentic WhatsApp Message Bubble */}
+        {/* Message Bubble */}
         <div
           className={`relative rounded-lg px-3 py-1.5 shadow-md transition-colors ${
             message.isDeleted
@@ -312,7 +312,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </div>
               )}
 
-              {/* Voice Note with Realistic WhatsApp Waveform Audio Player */}
+              {/* Voice Note Player */}
               {message.type === 'voice' && message.fileUrl && (
                 <VoiceNotePlayer
                   messageId={message.id}
@@ -341,7 +341,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {message.isEdited && <span className="text-[9px]">Edited •</span>}
             <span>{formatTime(message.createdAt)}</span>
 
-            {/* Read/Delivery Receipts (WhatsApp Blue Double Ticks) */}
+            {/* Read/Delivery Receipts (Double Ticks) */}
             {isSelf && (
               <span className="inline-flex items-center ml-0.5">
                 {message.readBy && message.readBy.length > 1 ? (

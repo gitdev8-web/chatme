@@ -100,7 +100,7 @@ export const NewChatDrawer: React.FC<NewChatDrawerProps> = ({
 
   return (
     <div className="absolute inset-0 z-30 flex flex-col bg-[#111b21] transition-transform duration-300 select-none animate-in slide-in-from-left">
-      {/* WhatsApp New Chat Header */}
+      {/* New Chat Header */}
       <div className="flex h-28 items-end bg-[#202c33] px-5 pb-4">
         <div className="flex items-center gap-6 text-[#e9edef]">
           <button

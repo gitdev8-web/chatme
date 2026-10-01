@@ -57,7 +57,7 @@ export const Modal: React.FC<ModalProps> = ({
         onClick={onClose}
       />
 
-      {/* Modal Card - WhatsApp Theme */}
+      {/* Modal Card */}
       <div
         className={`relative z-10 w-full ${widthClasses[maxWidth]} overflow-hidden rounded-2xl border border-[#222d34] bg-[#111b21] shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95 my-auto max-h-[90vh] flex flex-col`}
       >

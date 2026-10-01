@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatProvider, useChat } from './context/ChatContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { ToastProvider } from './components/common/Toast';
 import { LoginView } from './components/auth/LoginView';
 import { RegisterView } from './components/auth/RegisterView';
@@ -193,7 +195,7 @@ const MainChatDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* WhatsApp Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation */}
       {!activeConversationId && (
         <BottomNav
           activeTab={activeBottomTab}
@@ -203,7 +205,7 @@ const MainChatDashboard: React.FC = () => {
         />
       )}
 
-      {/* WhatsApp Status Updates Modal */}
+      {/* Status Updates Modal */}
       <StatusModal
         isOpen={isStatusOpen}
         onClose={() => {
@@ -212,7 +214,7 @@ const MainChatDashboard: React.FC = () => {
         }}
       />
 
-      {/* WhatsApp Groups Hub Modal */}
+      {/* Groups Hub Modal */}
       <GroupsHubModal
         isOpen={isGroupsHubOpen}
         onClose={() => {
@@ -334,7 +336,7 @@ const AppContent: React.FC = () => {
             alt="DEV CHAT"
             className="h-16 w-16 rounded-2xl shadow-xl shadow-[#00a884]/25 object-cover border border-[#00a884]/30 mb-6"
           />
-          {/* Authentic WhatsApp loading bar */}
+          {/* Loading bar */}
           <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
             <div className="h-full bg-[#00a884] rounded-full animate-pulse w-3/5" />
           </div>
@@ -388,20 +390,22 @@ const AppContent: React.FC = () => {
     );
   }
 
-  return (
-    <ChatProvider>
-      <MainChatDashboard />
-    </ChatProvider>
-  );
+  return <MainChatDashboard />;
 };
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <AppContent />
-        <PWAUpdateToast />
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <NotificationProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <ChatProvider>
+              <AppContent />
+              <PWAUpdateToast />
+            </ChatProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </NotificationProvider>
+    </ThemeProvider>
   );
 }

@@ -13,8 +13,10 @@ import {
   Eye,
   Loader2,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useChat } from '../../context/ChatContext';
 import { UserStatusStory } from '../../types';
 import { subscribeToStatusStories } from '../../services/statusService';
 import { Avatar } from '../common/Avatar';
@@ -29,6 +31,7 @@ interface StatusModalProps {
 
 export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => {
   const { user, profile } = useAuth();
+  const { userCache } = useChat();
   const [allStories, setAllStories] = useState<UserStatusStory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -36,6 +39,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
   const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [showViewedSection, setShowViewedSection] = useState(true);
+  const [statusSearch, setStatusSearch] = useState('');
 
   // Subscribe to live statuses
   useEffect(() => {
@@ -50,8 +54,32 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
 
   if (!isOpen) return null;
 
-  const myStories = allStories.filter((s) => s.userId === user?.uid);
-  const otherStories = allStories.filter((s) => s.userId !== user?.uid);
+  // Enrich status stories with latest userCache info
+  const enrichedStories = allStories.map((s) => {
+    const cachedUser = userCache[s.userId];
+    if (cachedUser) {
+      return {
+        ...s,
+        userName: cachedUser.displayName || s.userName,
+        userPhotoURL: cachedUser.photoURL || s.userPhotoURL,
+      };
+    }
+    return s;
+  });
+
+  const myStories = enrichedStories.filter((s) => s.userId === user?.uid);
+  let otherStories = enrichedStories.filter((s) => s.userId !== user?.uid);
+
+  // Apply search query filter if typed
+  if (statusSearch.trim()) {
+    const q = statusSearch.toLowerCase();
+    otherStories = otherStories.filter(
+      (s) =>
+        s.userName.toLowerCase().includes(q) ||
+        (s.text && s.text.toLowerCase().includes(q)) ||
+        (s.caption && s.caption.toLowerCase().includes(q))
+    );
+  }
 
   // Group other stories by user
   const groupedByUser: Record<string, UserStatusStory[]> = {};
@@ -171,6 +199,18 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
             </div>
           </div>
 
+          {/* Status Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+            <input
+              type="text"
+              value={statusSearch}
+              onChange={(e) => setStatusSearch(e.target.value)}
+              placeholder="Search status updates by contact name..."
+              className="w-full rounded-xl bg-[#202c33] border border-[#222d34] pl-9 pr-4 py-2 text-xs text-[#e9edef] placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition"
+            />
+          </div>
+
           {/* Recent Updates */}
           <div className="space-y-2">
             <h5 className="text-[11px] font-bold uppercase tracking-wider text-[#8696a0] px-1">
@@ -205,7 +245,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ isOpen, onClose }) => 
                     onClick={() => handleOpenStories(g.stories)}
                     className="flex items-center gap-3 p-2.5 rounded-2xl bg-[#202c33]/60 hover:bg-[#202c33] cursor-pointer transition border border-[#222d34]"
                   >
-                    {/* WhatsApp Green Gradient Ring */}
+                    {/* Status Gradient Ring */}
                     <div className="p-0.5 rounded-full bg-gradient-to-tr from-[#25d366] to-[#00a884] ring-2 ring-[#25d366]/60">
                       <Avatar
                         src={latest.userPhotoURL}

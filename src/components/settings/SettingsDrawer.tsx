@@ -19,7 +19,9 @@ import {
   Check,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { Avatar } from '../common/Avatar';
+import { ThemeToggle } from '../common/ThemeToggle';
 import { useToast } from '../common/Toast';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 
@@ -143,13 +145,16 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Theme & Wallpaper */}
-              <div className="flex items-center gap-5 px-6 py-4 cursor-pointer hover:bg-[#202c33] transition text-[#e9edef]">
-                <Wallpaper className="h-5 w-5 text-[#8696a0]" />
-                <div className="flex-1">
-                  <span className="text-sm font-normal">Chat wallpaper</span>
-                  <p className="text-[11px] text-[#8696a0]">WhatsApp dark doodle pattern</p>
+              {/* Theme Toggle */}
+              <div className="flex items-center justify-between px-6 py-4 hover:bg-[#202c33] transition text-[#e9edef]">
+                <div className="flex items-center gap-5">
+                  <Moon className="h-5 w-5 text-[#8696a0]" />
+                  <div>
+                    <span className="text-sm font-normal">App Theme</span>
+                    <p className="text-[11px] text-[#8696a0]">Toggle dark and light mode</p>
+                  </div>
                 </div>
+                <ThemeToggle showLabel={true} />
               </div>
 
               {/* Keyboard Shortcuts */}

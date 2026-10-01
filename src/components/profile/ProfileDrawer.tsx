@@ -122,7 +122,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
 
   return (
     <div className="absolute inset-0 z-30 flex flex-col bg-[#111b21] transition-transform duration-300 select-none animate-in slide-in-from-left">
-      {/* WhatsApp Profile Green Top Bar */}
+      {/* Profile Top Bar */}
       <div className="flex h-28 items-end bg-[#202c33] px-5 pb-4">
         <div className="flex items-center gap-6 text-[#e9edef]">
           <button
