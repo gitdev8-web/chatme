@@ -56,33 +56,32 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
           <span>DEV CHAT {call.callType === 'video' ? 'Video' : 'Voice'} Call</span>
         </div>
 
-        {/* Pulsing Avatar */}
-        <div className="relative mb-4 flex items-center justify-center">
-          <span className="absolute h-28 w-28 rounded-full bg-[#00a884]/20 animate-ping" />
-          <span className="absolute h-24 w-24 rounded-full bg-[#00a884]/30" />
+        {/* Profile Avatar with subtle ripple */}
+        <div className="relative mb-5 flex items-center justify-center">
+          <span className="absolute h-24 w-24 rounded-full bg-[#00a884]/20 animate-pulse" />
           <Avatar
             src={call.callerPhoto}
             name={call.callerName}
             size="xl"
-            className="ring-4 ring-[#00a884] shadow-2xl"
+            className="ring-2 ring-[#00a884] shadow-xl"
           />
         </div>
 
         {/* Caller Info */}
-        <h3 className="text-xl font-medium text-[#e9edef] mt-2">
+        <h3 className="text-lg font-semibold text-[#e9edef] mt-1">
           {call.callerName}
         </h3>
-        <p className="text-xs text-[#8696a0] mt-1">
-          Incoming {call.callType === 'video' ? 'video' : 'voice'} call...
+        <p className="text-xs text-[#8696a0] mt-1 font-normal">
+          WhatsApp {call.callType === 'video' ? 'video' : 'voice'} call...
         </p>
 
         {/* Action Controls */}
-        <div className="flex items-center justify-center gap-12 mt-8 w-full">
+        <div className="flex items-center justify-center gap-14 mt-8 w-full">
           {/* Decline Button */}
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={handleDecline}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ea4335] text-white shadow-xl hover:bg-[#d93025] hover:scale-105 active:scale-95 transition"
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ea4335] text-white shadow-lg hover:bg-[#d93025] active:scale-95 transition cursor-pointer"
               title="Decline"
             >
               <PhoneOff className="h-6 w-6" />
@@ -94,7 +93,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={handleAccept}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-xl hover:bg-[#20bd5a] hover:scale-105 active:scale-95 transition animate-bounce"
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-lg hover:bg-[#20bd5a] active:scale-95 transition cursor-pointer"
               title="Accept"
             >
               {call.callType === 'video' ? (

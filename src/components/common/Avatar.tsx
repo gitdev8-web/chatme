@@ -33,14 +33,16 @@ const presenceSizes = {
   '2xl': 'w-5 h-5 right-2 bottom-2 border-2',
 };
 
-// Deterministic gradient based on string name
-const bgGradients = [
-  'from-emerald-500 to-teal-700',
-  'from-cyan-500 to-blue-700',
-  'from-indigo-500 to-purple-700',
-  'from-pink-500 to-rose-700',
-  'from-amber-500 to-orange-700',
-  'from-violet-500 to-fuchsia-700',
+// Authentic WhatsApp muted profile avatar backgrounds
+const bgColors = [
+  'bg-[#00a884]',
+  'bg-[#128c7e]',
+  'bg-[#53bdeb]',
+  'bg-[#34b7f1]',
+  'bg-[#6b7b84]',
+  'bg-[#008069]',
+  'bg-[#4f5d64]',
+  'bg-[#2a3942]',
 ];
 
 export const Avatar: React.FC<AvatarProps> = ({
@@ -61,13 +63,13 @@ export const Avatar: React.FC<AvatarProps> = ({
     return str.slice(0, 2).toUpperCase();
   };
 
-  const getGradient = (str: string) => {
+  const getColor = (str: string) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const idx = Math.abs(hash) % bgGradients.length;
-    return bgGradients[idx];
+    const idx = Math.abs(hash) % bgColors.length;
+    return bgColors[idx];
   };
 
   return (
@@ -81,7 +83,7 @@ export const Avatar: React.FC<AvatarProps> = ({
         <img
           src={src}
           alt={name}
-          className={`${sizeClasses[size]} rounded-full object-cover shadow-inner ring-1 ring-slate-700/50`}
+          className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-1 ring-white/10`}
           onError={(e) => {
             // fallback if broken image
             e.currentTarget.style.display = 'none';
@@ -89,9 +91,9 @@ export const Avatar: React.FC<AvatarProps> = ({
         />
       ) : (
         <div
-          className={`${sizeClasses[size]} rounded-full bg-gradient-to-tr ${getGradient(
+          className={`${sizeClasses[size]} rounded-full ${getColor(
             name
-          )} flex items-center justify-center font-semibold text-white shadow-inner ring-1 ring-white/10`}
+          )} flex items-center justify-center font-medium text-white shadow-sm ring-1 ring-white/10 tracking-tight`}
         >
           {getInitials(name)}
         </div>

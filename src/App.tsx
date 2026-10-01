@@ -9,7 +9,6 @@ import { ChatProvider, useChat } from './context/ChatContext';
 import { ToastProvider } from './components/common/Toast';
 import { LoginView } from './components/auth/LoginView';
 import { RegisterView } from './components/auth/RegisterView';
-import { PhoneAuthView } from './components/auth/PhoneAuthView';
 import { Sidebar } from './components/chat/Sidebar';
 import { ChatArea } from './components/chat/ChatArea';
 import { ChatDetailsSidebar } from './components/chat/ChatDetailsSidebar';
@@ -22,12 +21,12 @@ import { SettingsModal } from './components/settings/SettingsModal';
 import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
 import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
-import { Realistic3DIcon } from './components/common/Realistic3DIcon';
 import { IncomingCallModal } from './components/calls/IncomingCallModal';
 import { CallModal } from './components/calls/CallModal';
 import { subscribeToIncomingCalls } from './services/callService';
 import { subscribeToStatusStories } from './services/statusService';
 import { CallSession } from './types';
+import { MessageSquare, Lock } from 'lucide-react';
 
 const MainChatDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -287,11 +286,9 @@ const MainChatDashboard: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { user, profile, loading } = useAuth();
-  const [authView, setAuthView] = useState<'email-login' | 'email-register' | 'phone'>(
+  const [authView, setAuthView] = useState<'email-login' | 'email-register'>(
     typeof window !== 'undefined' && window.location.pathname === '/register'
       ? 'email-register'
-      : typeof window !== 'undefined' && window.location.pathname === '/phone'
-      ? 'phone'
       : 'email-login'
   );
 
@@ -299,9 +296,7 @@ const AppContent: React.FC = () => {
     if (!user && !loading) {
       if (window.location.pathname === '/register') {
         setAuthView('email-register');
-      } else if (window.location.pathname === '/phone') {
-        setAuthView('phone');
-      } else if (window.location.pathname === '/login') {
+      } else {
         setAuthView('email-login');
       }
     }
@@ -311,8 +306,6 @@ const AppContent: React.FC = () => {
     if (!user && !loading) {
       if (authView === 'email-register') {
         window.history.replaceState(null, '', '/register');
-      } else if (authView === 'phone') {
-        window.history.replaceState(null, '', '/phone');
       } else {
         window.history.replaceState(null, '', '/login');
       }
@@ -333,15 +326,23 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
-        <div className="mb-4">
-          <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
+      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0c1317] text-[#e9edef] select-none p-6">
+        <div className="flex flex-col items-center max-w-sm text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-lg mb-6 shadow-[#00a884]/20">
+            <MessageSquare className="h-7 w-7 fill-current" />
+          </div>
+          {/* Authentic WhatsApp loading bar */}
+          <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
+            <div className="h-full bg-[#00a884] rounded-full animate-pulse w-3/5" />
+          </div>
+          <h2 className="text-base font-semibold tracking-tight text-white">
+            DEV CHAT Web
+          </h2>
+          <div className="mt-8 flex items-center gap-1.5 text-xs text-[#8696a0]">
+            <Lock className="h-3.5 w-3.5 text-[#00a884]" />
+            <span>End-to-end encrypted</span>
+          </div>
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
-          <span>DEV CHAT</span>
-          <span className="text-[#25d366]">Web</span>
-        </h2>
-        <p className="mt-2 text-xs text-[#8696a0]">End-to-end encrypted messaging</p>
       </div>
     );
   }
@@ -352,17 +353,12 @@ const AppContent: React.FC = () => {
       return (
         <RegisterView
           onSwitchToLogin={() => setAuthView('email-login')}
-          onSwitchToPhone={() => setAuthView('phone')}
         />
       );
-    }
-    if (authView === 'phone') {
-      return <PhoneAuthView onSwitchToEmail={() => setAuthView('email-login')} />;
     }
     return (
       <LoginView
         onSwitchToRegister={() => setAuthView('email-register')}
-        onSwitchToPhone={() => setAuthView('phone')}
       />
     );
   }
@@ -370,15 +366,19 @@ const AppContent: React.FC = () => {
   // Authenticated, waiting for profile sync
   if (!profile) {
     return (
-      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0b141a] text-[#e9edef] select-none">
-        <div className="mb-4">
-          <Realistic3DIcon name="whatsapp" size="2xl" showDots={true} />
+      <div className="flex h-[100dvh] w-screen flex-col items-center justify-center bg-[#0c1317] text-[#e9edef] select-none p-6">
+        <div className="flex flex-col items-center max-w-sm text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-lg mb-6 shadow-[#00a884]/20">
+            <MessageSquare className="h-7 w-7 fill-current" />
+          </div>
+          <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
+            <div className="h-full bg-[#00a884] rounded-full animate-pulse w-4/5" />
+          </div>
+          <h2 className="text-base font-semibold tracking-tight text-white">
+            DEV CHAT Web
+          </h2>
+          <p className="mt-1 text-xs text-[#8696a0]">Opening your chats...</p>
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 mt-2">
-          <span>DEV CHAT</span>
-          <span className="text-[#25d366]">Web</span>
-        </h2>
-        <p className="mt-2 text-xs text-[#8696a0]">Opening your chats...</p>
       </div>
     );
   }

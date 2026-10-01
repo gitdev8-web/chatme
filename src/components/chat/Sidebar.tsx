@@ -16,7 +16,6 @@ import {
   CheckSquare,
   Settings,
   LogOut,
-  Radio,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -204,15 +203,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {hasUnreadStories && (
               <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#00a884] ring-2 ring-[#202c33]" />
             )}
-          </button>
-
-          {/* Channels / Broadcast */}
-          <button
-            onClick={onOpenGroupsHub}
-            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
-            title="Channels"
-          >
-            <Radio className="h-5 w-5" />
           </button>
 
           {/* New Chat */}
