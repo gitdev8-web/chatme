@@ -195,3 +195,65 @@ export async function addCallIceCandidate(
   }
 }
 
+export function subscribeToUserCallHistory(
+  currentUid: string,
+  onUpdate: (calls: CallSession[]) => void
+): () => void {
+  if (!currentUid) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  const callsRef = collection(db, 'calls');
+  const qOutgoing = query(callsRef, where('callerId', '==', currentUid));
+  const qIncoming = query(callsRef, where('receiverId', '==', currentUid));
+
+  let outgoingCalls: CallSession[] = [];
+  let incomingCalls: CallSession[] = [];
+
+  const emitMerged = () => {
+    const map = new Map<string, CallSession>();
+    [...outgoingCalls, ...incomingCalls].forEach((c) => {
+      if (c && c.id) map.set(c.id, c);
+    });
+    const merged = Array.from(map.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    onUpdate(merged);
+  };
+
+  const unsubOut = onSnapshot(
+    qOutgoing,
+    (snap) => {
+      outgoingCalls = snap.docs.map((d) => ({ ...(d.data() as CallSession), id: d.id }));
+      emitMerged();
+    },
+    () => {
+      outgoingCalls = [];
+      emitMerged();
+    }
+  );
+
+  const unsubIn = onSnapshot(
+    qIncoming,
+    (snap) => {
+      incomingCalls = snap.docs.map((d) => ({ ...(d.data() as CallSession), id: d.id }));
+      emitMerged();
+    },
+    () => {
+      incomingCalls = [];
+      emitMerged();
+    }
+  );
+
+  return () => {
+    unsubOut();
+    unsubIn();
+  };
+}
+
+export function getCallDurationSeconds(call: CallSession): number | null {
+  if (!call.startedAt || !call.endedAt) return null;
+  const diff = new Date(call.endedAt).getTime() - new Date(call.startedAt).getTime();
+  return diff > 0 ? Math.round(diff / 1000) : null;
+}

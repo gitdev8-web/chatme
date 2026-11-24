@@ -8,13 +8,7 @@ import {
   Bell,
   Send,
   Trash2,
-  Users,
-  AlertCircle,
-  Sparkles,
-  Calendar,
   CheckCircle2,
-  Clock,
-  Radio,
 } from 'lucide-react';
 import { SystemAnnouncement } from '../../types/admin';
 import {
@@ -24,6 +18,7 @@ import {
 } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 export const AdminNotificationsView: React.FC = () => {
   const { user } = useAuth();
@@ -38,6 +33,8 @@ export const AdminNotificationsView: React.FC = () => {
   const [targetAudience, setTargetAudience] = useState<'all' | 'active' | 'specific'>('all');
   const [priority, setPriority] = useState<'normal' | 'important' | 'critical'>('normal');
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SystemAnnouncement | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchAnnouncementsList = async () => {
     setLoading(true);
@@ -87,17 +84,21 @@ export const AdminNotificationsView: React.FC = () => {
     }
   };
 
-  const handleDelete = async (announcementId: string) => {
-    if (!user) return;
+  const handleConfirmDelete = async () => {
+    if (!user || !deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteAnnouncement(announcementId, {
+      await deleteAnnouncement(deleteTarget.id, {
         id: user.uid,
         email: user.email || 'admin@devchat.app',
       });
       showToast('Announcement removed', 'info');
+      setDeleteTarget(null);
       fetchAnnouncementsList();
     } catch {
       showToast('Failed to delete announcement', 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -265,7 +266,7 @@ export const AdminNotificationsView: React.FC = () => {
                     </div>
 
                     <button
-                      onClick={() => handleDelete(ann.id)}
+                      onClick={() => setDeleteTarget(ann)}
                       className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
                       title="Remove Announcement"
                     >
@@ -277,7 +278,7 @@ export const AdminNotificationsView: React.FC = () => {
                     {ann.message}
                   </p>
 
-                  <div className="flex items-center justify-between text-[10px] text-[#8696a0] font-mono pt-1">
+                  <div className="flex items-center justify-between text-[10px] text-[#8696a0] font-mono pt-1 tabular-nums">
                     <span>By: {ann.createdBy}</span>
                     <span>{new Date(ann.createdAt).toLocaleString()}</span>
                   </div>
@@ -287,6 +288,21 @@ export const AdminNotificationsView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Remove Announcement"
+        description={
+          deleteTarget
+            ? `Remove broadcast "${deleteTarget.title}"? Connected users will no longer see this banner.`
+            : ''
+        }
+        confirmText="Remove"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 };

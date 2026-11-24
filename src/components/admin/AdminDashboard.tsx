@@ -17,14 +17,13 @@ import { AdminSecurityView } from './AdminSecurityView';
 import { AdminSettingsView } from './AdminSettingsView';
 import { AdminLoginView } from './AdminLoginView';
 import {
-  getAdminRole,
   getDashboardMetrics,
   getAdminUsers,
   getAdminReports,
 } from '../../services/adminService';
 import { DashboardMetrics, AdminRoleType, ModerationReportItem } from '../../types/admin';
 import { UserProfile } from '../../types';
-import { Shield, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Shield } from 'lucide-react';
 
 interface AdminDashboardProps {
   onReturnToApp: () => void;
@@ -130,7 +129,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="flex h-[100dvh] w-screen items-center justify-center bg-[#080d10] text-[#e9edef]">
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00a884]/20 border border-[#00a884]/40 text-[#00a884]">
-            <Shield className="h-6 w-6 animate-pulse" />
+            <Shield className="h-6 w-6" />
           </div>
           <p className="text-xs text-[#8696a0]">Verifying administrative credentials...</p>
         </div>

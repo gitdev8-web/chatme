@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Send,
   Paperclip,
@@ -14,21 +14,15 @@ import {
   Image as ImageIcon,
   File as FileIcon,
   Camera,
-  Headphones,
 } from 'lucide-react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../common/Toast';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { VoiceRecorderComponent } from './VoiceRecorderComponent';
 import { MediaPreviewModal } from './MediaPreviewModal';
 import { compressImage } from '../../utils/imageUtils';
 import { Emoji3DPicker } from '../emoji/Emoji3DPicker';
-
-const EMOJI_LIST = [
-  '😀', '😂', '😍', '🔥', '👍', '❤️', '🎉', '🙌',
-  '😎', '🤔', '👀', '🚀', '💯', '✨', '👋', '🙏',
-  '👏', '🥳', '😭', '😇', '💡', '💬', '☕', '⚡',
-];
 
 interface MessageComposerProps {
   onSendTextMessage: (text: string) => Promise<void>;
@@ -38,13 +32,18 @@ interface MessageComposerProps {
     fileName: string,
     duration?: number
   ) => Promise<void>;
+  maxFileSizeMb?: number;
+  disabled?: boolean;
 }
 
 export const MessageComposer: React.FC<MessageComposerProps> = ({
   onSendTextMessage,
   onSendFileMessage,
+  maxFileSizeMb = 25,
+  disabled = false,
 }) => {
   const { profile } = useAuth();
+  const { showToast } = useToast();
   const { replyingTo, setReplyingTo, emitTyping, uploadProgress } = useChat();
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -57,14 +56,34 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const attachMenuRef = useRef<HTMLDivElement | null>(null);
 
   const voiceRecorder = useVoiceRecorder();
+
+  useEffect(() => {
+    if (!showAttachMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+        setShowAttachMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAttachMenu]);
+
+  const validateFileSize = (file: File): boolean => {
+    const limitBytes = (maxFileSizeMb || 25) * 1024 * 1024;
+    if (file.size > limitBytes) {
+      showToast(`File exceeds maximum upload limit (${maxFileSizeMb} MB)`, 'error');
+      return false;
+    }
+    return true;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
     emitTyping(e.target.value.length > 0);
 
-    // Auto-adjust height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
@@ -80,7 +99,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const handleSend = async () => {
-    if (!text.trim()) return;
+    if (disabled || !text.trim()) return;
     const content = text;
     setText('');
     if (textareaRef.current) {
@@ -100,7 +119,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      e.target.value = '';
       setShowAttachMenu(false);
+      if (!validateFileSize(file)) return;
       try {
         const compressed = await compressImage(file, 1280, 0.85);
         setPendingImageFile(compressed.file);
@@ -121,7 +142,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      e.target.value = '';
       setShowAttachMenu(false);
+      if (!validateFileSize(file)) return;
       onSendFileMessage(file, 'file', file.name);
     }
   };
@@ -173,7 +196,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setReplyingTo(null)}
+            aria-label="Cancel reply"
             className="rounded p-1 text-[#8696a0] hover:text-white"
           >
             <X className="h-3.5 w-3.5" />
@@ -189,19 +214,20 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           onStopAndSend={handleSendVoiceNote}
         />
       ) : (
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-1.5 sm:gap-2" ref={attachMenuRef}>
           {/* 3D Emoji Picker Popup */}
           <Emoji3DPicker
             isOpen={showEmojiPicker}
             onClose={() => setShowEmojiPicker(false)}
             onSelectEmoji={handleEmojiClick}
-            position={window.innerWidth < 640 ? 'bottom-sheet' : 'bottom-left'}
+            position={typeof window !== 'undefined' && window.innerWidth < 640 ? 'bottom-sheet' : 'bottom-left'}
           />
 
           {/* Attachment Popup */}
           {showAttachMenu && (
             <div className="absolute bottom-16 left-12 z-30 flex flex-col gap-1 rounded-2xl border border-[#222d34] bg-[#202c33] p-2 shadow-2xl backdrop-blur-md animate-in fade-in w-48">
               <button
+                type="button"
                 onClick={() => imageInputRef.current?.click()}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
@@ -212,6 +238,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={() => cameraInputRef.current?.click()}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
@@ -222,6 +249,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#e9edef] hover:bg-[#111b21] transition"
               >
@@ -258,23 +286,29 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
           {/* Action Buttons Left */}
           <button
+            type="button"
+            disabled={disabled}
             onClick={() => {
               setShowEmojiPicker(!showEmojiPicker);
               setShowAttachMenu(false);
             }}
-            className="rounded-xl p-2.5 text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition disabled:opacity-40"
             title="Emoji"
+            aria-label="Open 3D emoji picker"
           >
             <Smile className="h-5 w-5" />
           </button>
 
           <button
+            type="button"
+            disabled={disabled}
             onClick={() => {
               setShowAttachMenu(!showAttachMenu);
               setShowEmojiPicker(false);
             }}
-            className="rounded-xl p-2.5 text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#8696a0] hover:bg-[#111b21] hover:text-[#e9edef] transition disabled:opacity-40"
             title="Attach file or photo"
+            aria-label="Attach file or photo"
           >
             <Paperclip className="h-5 w-5" />
           </button>
@@ -284,28 +318,35 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             <textarea
               ref={textareaRef}
               rows={1}
+              disabled={disabled}
               value={text}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              className="w-full resize-none rounded-2xl border-none bg-[#2a3942] px-3.5 sm:px-4 py-2 sm:py-2.5 text-[15px] sm:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none transition max-h-32"
+              placeholder={disabled ? 'Messaging temporarily paused' : 'Type a message...'}
+              className="w-full resize-none rounded-2xl border border-transparent focus:border-[#00a884]/40 bg-[#2a3942] px-3.5 sm:px-4 py-2.5 text-[15px] sm:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none transition max-h-32 disabled:opacity-60"
             />
           </div>
 
           {/* Voice Note or Send Button */}
           {text.trim() ? (
             <button
+              type="button"
+              disabled={disabled}
               onClick={handleSend}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-md hover:bg-[#009374] transition"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#00a884] text-[#0b141a] shadow-md hover:bg-[#06cf9c] active:scale-95 transition disabled:opacity-50"
               title="Send message"
+              aria-label="Send message"
             >
               <Send className="h-4 w-4" />
             </button>
           ) : (
             <button
+              type="button"
+              disabled={disabled}
               onClick={voiceRecorder.startRecording}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#202c33] text-[#8696a0] hover:bg-[#00a884] hover:text-white transition"
-              title="Hold to record voice message"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#111b21]/60 text-[#8696a0] hover:bg-[#00a884] hover:text-[#0b141a] transition disabled:opacity-40"
+              title="Record voice message"
+              aria-label="Record voice message"
             >
               <Mic className="h-4 w-4" />
             </button>

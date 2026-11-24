@@ -12,7 +12,6 @@ import {
   Eye,
   EyeOff,
   Shield,
-  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ForgotPasswordModal } from './ForgotPasswordModal';

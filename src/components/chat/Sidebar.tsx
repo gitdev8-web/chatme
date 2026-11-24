@@ -12,10 +12,8 @@ import {
   MoreVertical,
   Filter,
   Archive,
-  Star,
-  CheckSquare,
-  Settings,
-  LogOut,
+  Phone,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -31,6 +29,7 @@ import { NewChatDrawer } from '../contacts/NewChatDrawer';
 import { StatusViewerModal } from '../status/StatusViewerModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { ThemeToggle } from '../common/ThemeToggle';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface SidebarProps {
   onOpenStatus: () => void;
@@ -67,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Slide-over Drawers
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
@@ -96,44 +96,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => unsub();
   }, []);
 
-  // Filter conversations
-  const filteredConversations = conversations.filter((conv) => {
-    // Archived filter logic
-    const isArchived = conv.archivedBy?.includes(user?.uid || '');
-    if (activeFilter === 'archived') {
-      if (!isArchived) return false;
-    } else {
-      if (isArchived) return false;
-    }
-
-    // Type / status filters
-    if (activeFilter === 'direct' && conv.type !== 'direct') return false;
-    if (activeFilter === 'groups' && conv.type !== 'group') return false;
-    if (activeFilter === 'unread') {
-      const unread = conv.unreadCounts?.[user?.uid || ''] || 0;
-      if (unread === 0) return false;
-    }
-
-    // Search query filter
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      if (conv.type === 'group' && (conv.name || '').toLowerCase().includes(q)) return true;
-      if ((conv.lastMessage?.text || '').toLowerCase().includes(q)) return true;
-
-      // Check partner's name or username
-      const partnerId = conv.participantIds?.find((id) => id !== user?.uid);
-      if (partnerId && userCache[partnerId]) {
-        const p = userCache[partnerId];
-        return (
-          (p?.displayName || '').toLowerCase().includes(q) ||
-          (p?.username || '').toLowerCase().includes(q)
-        );
+  // Filter & sort (pinned first, then updatedAt desc)
+  const filteredConversations = conversations
+    .filter((conv) => {
+      const isArchived = conv.archivedBy?.includes(user?.uid || '');
+      if (activeFilter === 'archived') {
+        if (!isArchived) return false;
+      } else {
+        if (isArchived) return false;
       }
-      return false;
-    }
 
-    return true;
-  });
+      if (activeFilter === 'direct' && conv.type !== 'direct') return false;
+      if (activeFilter === 'groups' && conv.type !== 'group') return false;
+      if (activeFilter === 'unread') {
+        const unread = conv.unreadCounts?.[user?.uid || ''] || 0;
+        if (unread === 0) return false;
+      }
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        if (conv.type === 'group' && (conv.name || '').toLowerCase().includes(q)) return true;
+        if ((conv.lastMessage?.text || '').toLowerCase().includes(q)) return true;
+
+        const partnerId = conv.participantIds?.find((id) => id !== user?.uid);
+        if (partnerId && userCache[partnerId]) {
+          const p = userCache[partnerId];
+          return (
+            (p?.displayName || '').toLowerCase().includes(q) ||
+            (p?.username || '').toLowerCase().includes(q)
+          );
+        }
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const aPinned = a.pinnedBy?.includes(user?.uid || '') ? 1 : 0;
+      const bPinned = b.pinnedBy?.includes(user?.uid || '') ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
 
   const archivedCount = conversations.filter((c) =>
     c.archivedBy?.includes(user?.uid || '')
@@ -168,12 +173,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       {/* Top Header */}
-      <div className="flex h-15 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 flex-shrink-0">
-        {/* User Profile Avatar */}
-        <div
+      <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 flex-shrink-0">
+        <button
+          type="button"
           onClick={() => setIsProfileDrawerOpen(true)}
-          className="flex items-center gap-3 cursor-pointer group"
-          title="Profile"
+          className="flex items-center gap-2.5 cursor-pointer group rounded-xl p-1 -ml-1 hover:bg-[#2a3942]/50 transition"
+          title="My Profile"
         >
           <Avatar
             src={profile?.photoURL}
@@ -182,63 +187,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
             isOnline={true}
             showPresence={true}
           />
-        </div>
+          <span className="text-sm font-bold tracking-tight text-[#e9edef] hidden sm:inline">
+            DEV CHAT
+          </span>
+        </button>
 
         {/* Right Action Icons */}
-        <div className="flex items-center gap-2 text-[#aebac1]">
-          {/* Communities / Groups */}
+        <div className="flex items-center gap-1 text-[#aebac1]">
           <button
             onClick={onOpenGroupsHub}
-            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
             title="Communities & Groups"
+            aria-label="Communities and Groups"
           >
             <Users className="h-5 w-5" />
           </button>
 
-          {/* Status Updates */}
           <button
             onClick={onOpenStatus}
-            className="relative p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
-            title="Status"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            title="Status Stories"
+            aria-label="Status Stories"
           >
             <CircleDashed className="h-5 w-5" />
             {hasUnreadStories && (
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#00a884] ring-2 ring-[#202c33]" />
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#25d366] ring-2 ring-[#202c33]" />
             )}
           </button>
 
-          {/* New Chat */}
+          <button
+            onClick={onOpenContacts}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            title="Calls & Contacts"
+            aria-label="Calls and Contacts"
+          >
+            <Phone className="h-[18px] w-[18px]" />
+          </button>
+
           <button
             onClick={() => setIsNewChatDrawerOpen(true)}
-            className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
             title="New chat"
+            aria-label="Start new chat"
           >
             <MessageSquarePlus className="h-5 w-5" />
           </button>
 
-          {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Install DEV CHAT PWA App Button */}
           <PWAInstallButton compact={true} />
 
           {/* 3-Dots Menu Dropdown */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-              className="p-2 rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
               title="Menu"
+              aria-label="Menu"
             >
               <MoreVertical className="h-5 w-5" />
             </button>
 
             {showMenuDropdown && (
-              <div className="absolute right-0 top-11 z-50 w-52 rounded-2xl border border-[#222d34] bg-[#233138] py-2 shadow-2xl backdrop-blur-md animate-in fade-in">
+              <div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-[#222d34] bg-[#233138] py-1.5 shadow-2xl backdrop-blur-md animate-in fade-in">
                 <PWAInstallButton variant="menu-item" />
                 <div className="px-4 py-2 flex items-center justify-between border-b border-[#222d34]/60">
                   <span className="text-xs text-[#d1d7db]">Theme</span>
                   <ThemeToggle />
                 </div>
+                <button
+                  onClick={() => {
+                    setShowMenuDropdown(false);
+                    onOpenProfile();
+                  }}
+                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  Profile
+                </button>
                 <button
                   onClick={() => {
                     setShowMenuDropdown(false);
@@ -255,16 +280,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }}
                   className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
                 >
-                  New community
+                  Communities
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenuDropdown(false);
+                    onOpenContacts();
+                  }}
+                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  Calls & Contacts
                 </button>
                 <button
                   onClick={() => {
                     setShowMenuDropdown(false);
                     setActiveFilter('archived');
                   }}
-                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                  className="flex w-full items-center justify-between px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
                 >
-                  Archived chats ({archivedCount})
+                  <span>Archived chats</span>
+                  <span className="tabular-nums text-[11px] font-semibold text-[#00a884]">{archivedCount}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -273,7 +308,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }}
                   className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
                 >
-                  Settings
+                  Settings (Quick)
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenuDropdown(false);
+                    onOpenSettings();
+                  }}
+                  className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  All Settings
                 </button>
                 {isAdmin && (
                   <button
@@ -281,18 +325,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       setShowMenuDropdown(false);
                       onOpenAdmin();
                     }}
-                    className="flex w-full items-center px-4 py-2.5 text-xs text-[#25d366] hover:bg-[#182229] transition"
+                    className="flex w-full items-center px-4 py-2.5 text-xs font-semibold text-[#25d366] hover:bg-[#182229] transition"
                   >
-                    Admin Moderation
+                    Admin Dashboard
                   </button>
                 )}
                 <div className="my-1 border-t border-[#222d34]" />
                 <button
                   onClick={() => {
                     setShowMenuDropdown(false);
-                    if (confirm('Log out of DEV CHAT?')) logout();
+                    setShowLogoutConfirm(true);
                   }}
-                  className="flex w-full items-center px-4 py-2.5 text-xs text-rose-400 hover:bg-[#182229] transition"
+                  className="flex w-full items-center px-4 py-2.5 text-xs font-medium text-rose-400 hover:bg-[#182229] transition"
                 >
                   Log out
                 </button>
@@ -311,18 +355,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search or start new chat"
-            className="w-full rounded-lg border border-transparent bg-[#202c33] pl-10 pr-3 py-1.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884] transition"
+            className="w-full rounded-xl border border-transparent bg-[#202c33] pl-10 pr-8 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884] transition"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[#8696a0] hover:text-[#e9edef]"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Unread Filter Button */}
         <button
           onClick={() =>
             setActiveFilter(activeFilter === 'unread' ? 'all' : 'unread')
           }
-          className={`p-2 rounded-lg transition ${
+          className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
             activeFilter === 'unread'
-              ? 'bg-[#00a884] text-white shadow-sm'
+              ? 'bg-[#00a884] text-[#0b141a] shadow-sm'
               : 'text-[#8696a0] hover:bg-[#202c33] hover:text-[#e9edef]'
           }`}
           title="Filter unread chats"
@@ -338,13 +391,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'unread', label: 'Unread' },
           { id: 'direct', label: 'Direct' },
           { id: 'groups', label: 'Groups' },
+          ...(archivedCount > 0 || activeFilter === 'archived'
+            ? [{ id: 'archived', label: `Archived (${archivedCount})` }]
+            : []),
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id as typeof activeFilter)}
-            className={`rounded-full px-3 py-1 text-xs font-normal transition-all whitespace-nowrap ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
               activeFilter === tab.id
-                ? 'bg-[#00a884] text-[#111b21] font-semibold shadow-sm'
+                ? 'bg-[#00a884] text-[#0b141a] font-semibold shadow-sm'
                 : 'bg-[#202c33] text-[#8696a0] hover:text-[#e9edef]'
             }`}
           >
@@ -353,17 +409,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
 
-      {/* Archived Banner (if applicable or active) */}
+      {/* Archived Banner */}
       {archivedCount > 0 && activeFilter !== 'archived' && (
         <div
           onClick={() => setActiveFilter('archived')}
-          className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#202c33] transition border-b border-[#222d34]/60 text-[#8696a0]"
+          className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-[#202c33] transition border-b border-[#222d34]/60 text-[#8696a0]"
         >
-          <div className="flex items-center gap-4">
-            <Archive className="h-5 w-5 text-[#00a884]" />
-            <span className="text-sm text-[#e9edef]">Archived</span>
+          <div className="flex items-center gap-3.5">
+            <Archive className="h-4 w-4 text-[#00a884]" />
+            <span className="text-xs font-medium text-[#e9edef]">Archived</span>
           </div>
-          <span className="text-xs font-semibold text-[#00a884]">
+          <span className="tabular-nums text-xs font-semibold text-[#00a884]">
             {archivedCount}
           </span>
         </div>
@@ -380,14 +436,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : filteredConversations.length === 0 ? (
           <EmptyState
             icon={MessageSquarePlus}
-            title={searchTerm ? 'No matches found' : 'No chats yet'}
+            title={searchTerm ? 'No matches found' : activeFilter === 'archived' ? 'No archived chats' : 'No chats yet'}
             description={
               searchTerm
                 ? `No chats match "${searchTerm}"`
+                : activeFilter === 'archived'
+                ? 'Archived conversations will appear here.'
                 : 'Start a direct chat or create a group to begin messaging.'
             }
-            actionText="New Chat"
-            onAction={() => setIsNewChatDrawerOpen(true)}
+            actionText={activeFilter === 'archived' ? 'Show All Chats' : 'New Chat'}
+            onAction={() => {
+              if (activeFilter === 'archived') setActiveFilter('all');
+              else setIsNewChatDrawerOpen(true);
+            }}
           />
         ) : (
           filteredConversations.map((conv) => (
@@ -416,10 +477,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Floating Action Button (FAB) for New Chat */}
       <button
         onClick={() => setIsNewChatDrawerOpen(true)}
-        className="absolute right-4 bottom-14 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#111b21] shadow-2xl hover:bg-[#06cf9c] hover:scale-105 active:scale-95 transition-all duration-200 group ring-4 ring-[#111b21]/60"
+        className="absolute right-4 bottom-20 md:bottom-6 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#0b141a] shadow-2xl hover:bg-[#06cf9c] hover:scale-105 active:scale-95 transition-all duration-200 group ring-4 ring-[#111b21]/70"
         title="Start New Chat"
+        aria-label="Start New Chat"
       >
-        <MessageSquarePlus className="h-6 w-6 stroke-[2.5] group-hover:rotate-12 transition-transform" />
+        <MessageSquarePlus className="h-6 w-6 stroke-[2.25] group-hover:rotate-6 transition-transform" />
       </button>
 
       {/* Story Viewer from Avatar click */}
@@ -427,6 +489,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isOpen={isStoryViewerOpen}
         onClose={() => setIsStoryViewerOpen(false)}
         stories={activeStoryList}
+      />
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={async () => {
+          setShowLogoutConfirm(false);
+          await logout();
+        }}
+        title="Log out of DEV CHAT?"
+        description="You will need to sign back in to access your chats, status updates, and calls."
+        confirmText="Log out"
+        variant="danger"
       />
     </aside>
   );

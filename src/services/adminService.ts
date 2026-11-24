@@ -22,6 +22,7 @@ import { auth, db } from '../firebase/config';
 import {
   AdminAuditLog,
   AdminRoleType,
+  DailyActivityPoint,
   DashboardMetrics,
   ModerationReportItem,
   SystemAnnouncement,
@@ -157,6 +158,24 @@ export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  // Prepare last 7 calendar days buckets
+  const activityBuckets: DailyActivityPoint[] = [];
+  const bucketMap = new Map<string, DailyActivityPoint>();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(todayStart);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const point: DailyActivityPoint = {
+      date: key,
+      label: d.toLocaleDateString([], { weekday: 'short' }),
+      users: 0,
+      messages: 0,
+      calls: 0,
+    };
+    activityBuckets.push(point);
+    bucketMap.set(key, point);
+  }
+
   try {
     // 1. Fetch Users
     const usersSnap = await getDocs(query(collection(db, 'users'), limit(500)));
@@ -173,8 +192,14 @@ export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
           activeUsersNow++;
         }
       }
-      if (data.createdAt && new Date(data.createdAt).getTime() >= todayStart.getTime()) {
-        newUsersToday++;
+      if (data.createdAt) {
+        const createdMs = new Date(data.createdAt).getTime();
+        if (createdMs >= todayStart.getTime()) {
+          newUsersToday++;
+        }
+        const dayKey = new Date(data.createdAt).toISOString().slice(0, 10);
+        const bucket = bucketMap.get(dayKey);
+        if (bucket) bucket.users += 1;
       }
     });
 
@@ -186,11 +211,14 @@ export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
       const data = d.data() as Conversation;
       if (data.lastMessage) {
         totalMessages++;
-        if (
-          data.lastMessage.timestamp &&
-          new Date(data.lastMessage.timestamp).getTime() >= todayStart.getTime()
-        ) {
-          messagesToday++;
+        if (data.lastMessage.timestamp) {
+          const tsMs = new Date(data.lastMessage.timestamp).getTime();
+          if (tsMs >= todayStart.getTime()) {
+            messagesToday++;
+          }
+          const dayKey = new Date(data.lastMessage.timestamp).toISOString().slice(0, 10);
+          const bucket = bucketMap.get(dayKey);
+          if (bucket) bucket.messages += 1;
         }
       }
     });
@@ -203,6 +231,11 @@ export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
         totalVideoCalls++;
       } else {
         totalVoiceCalls++;
+      }
+      if (data.createdAt) {
+        const dayKey = new Date(data.createdAt).toISOString().slice(0, 10);
+        const bucket = bucketMap.get(dayKey);
+        if (bucket) bucket.calls += 1;
       }
     });
 
@@ -247,6 +280,7 @@ export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
     pendingReports,
     resolvedReports,
     storageUsedMb: Math.round((totalUsers * 0.05 + totalConversations * 0.12) * 10) / 10,
+    dailyActivity: activityBuckets,
     systemHealth,
   };
 };

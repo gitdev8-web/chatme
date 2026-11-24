@@ -13,15 +13,19 @@ import {
   Eye,
   EyeOff,
   Shield,
-  MessageSquare,
+  LockKeyhole,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface RegisterViewProps {
   onSwitchToLogin: () => void;
+  registrationOpen?: boolean;
 }
 
-export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) => {
+export const RegisterView: React.FC<RegisterViewProps> = ({
+  onSwitchToLogin,
+  registrationOpen = true,
+}) => {
   const { registerWithEmail } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
@@ -144,6 +148,19 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) =
             </div>
           )}
 
+          {/* Registrations Closed Notice */}
+          {!registrationOpen && (
+            <div className="mb-4 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3.5 text-xs text-amber-300 flex items-start gap-2.5">
+              <LockKeyhole className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">New registrations are paused</p>
+                <p className="text-[11px] opacity-85 mt-0.5">
+                  Please sign in with an existing account or check back later.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
@@ -237,7 +254,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onSwitchToLogin }) =
             {/* Primary Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !registrationOpen}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 text-xs font-semibold text-[#111b21] shadow-md hover:bg-[#06cf9c] active:scale-[0.98] transition disabled:opacity-50 mt-2 cursor-pointer"
             >
               <span>{loading ? 'Creating account...' : 'Create Account'}</span>

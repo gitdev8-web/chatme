@@ -32,6 +32,7 @@ import {
   markStoryAsViewed,
 } from '../services/statusService';
 import {
+  clearChatForUser,
   createGroupConversation,
   deleteConversationForUser,
   deleteMessageForEveryone,
@@ -43,6 +44,7 @@ import {
   sendMessage,
   setTypingStatus,
   toggleMessageReaction,
+  toggleStarMessage,
 } from '../services/chatService';
 import { uploadFileWithProgress } from '../services/storageService';
 import { subscribeToAllPresence } from '../services/presenceService';
@@ -84,6 +86,8 @@ interface ChatContextType {
   editCurrentMessage: (messageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string, forEveryone: boolean) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
+  clearConversation: (conversationId: string) => Promise<void>;
+  starMessage: (messageId: string, shouldStar: boolean) => Promise<void>;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   emitTyping: (isTyping: boolean) => void;
   getUserProfile: (uid: string) => Promise<UserProfile | null>;
@@ -237,8 +241,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
               markMessagesAsDelivered(conv.id, user.uid, [conv.lastMessage.id]);
             }
 
-            // Trigger notification if message has not been notified yet
-            if (!notifiedMsgIdsRef.current.has(conv.lastMessage.id)) {
+            // Trigger notification if message has not been notified yet & conversation isn't muted
+            const isMuted = conv.mutedBy?.includes(user.uid);
+            if (!notifiedMsgIdsRef.current.has(conv.lastMessage.id) && !isMuted && activeConversationId !== conv.id) {
               notifiedMsgIdsRef.current.add(conv.lastMessage.id);
 
               // Get sender details
@@ -257,6 +262,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 conversationId: conv.id,
                 onClick: () => setActiveConversationId(conv.id),
               });
+            } else {
+              notifiedMsgIdsRef.current.add(conv.lastMessage.id);
             }
           }
         });
@@ -289,13 +296,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const markActiveAsReadIfVisible = () => {
       const isVisible = document.visibilityState === 'visible';
       const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+      const sendReadReceipts = profile?.readReceipts !== false;
 
       if (isVisible && isFocused && currentUnreadIds.length > 0) {
-        markConversationAsRead(activeConversationId, user.uid, currentUnreadIds);
+        markConversationAsRead(
+          activeConversationId,
+          user.uid,
+          sendReadReceipts ? currentUnreadIds : []
+        );
       } else if (currentUnreadIds.length > 0) {
         markMessagesAsDelivered(activeConversationId, user.uid, currentUnreadIds);
       }
     };
+
+    const userClearedAt = activeConversation?.clearedAt?.[user.uid];
+    const clearedAtMs = userClearedAt ? new Date(userClearedAt).getTime() : 0;
 
     const unsubscribe = onSnapshot(
       q,
@@ -303,8 +318,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const msgs: Message[] = [];
         snapshot.forEach((doc) => {
           const msg = doc.data() as Message;
-          // Filter out if deleted for current user
-          if (!msg.deletedFor?.includes(user.uid)) {
+          const msgMs = msg.createdAt ? new Date(msg.createdAt).getTime() : 0;
+          const hiddenByClear = clearedAtMs > 0 && msgMs <= clearedAtMs;
+          // Filter out if deleted for current user or cleared before timestamp
+          if (!msg.deletedFor?.includes(user.uid) && !hiddenByClear) {
             msgs.push(msg);
           }
         });
@@ -592,6 +609,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Clear messages in conversation for current user
+  const clearConversation = async (conversationId: string) => {
+    if (!user || !conversationId) return;
+    await clearChatForUser(conversationId, user.uid);
+    if (activeConversationId === conversationId) {
+      setMessages([]);
+    }
+  };
+
+  // Star or unstar a message persistently
+  const starMessage = async (messageId: string, shouldStar: boolean) => {
+    if (!user || !activeConversationId) return;
+    sound.playPop();
+    await toggleStarMessage(activeConversationId, messageId, user.uid, shouldStar);
+  };
+
   // React to message
   const reactToMessage = async (messageId: string, emoji: string) => {
     if (!user || !activeConversationId) return;
@@ -656,6 +689,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         editCurrentMessage,
         deleteMessage,
         deleteConversation,
+        clearConversation,
+        starMessage,
         reactToMessage,
         emitTyping,
         getUserProfile,

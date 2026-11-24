@@ -5,23 +5,14 @@
 
 import React, { useState } from 'react';
 import {
-  Users,
   Search,
-  Filter,
   Shield,
   Ban,
   UserCheck,
   Trash2,
-  MoreVertical,
-  Calendar,
-  Clock,
-  Phone,
-  Mail,
-  UserX,
-  Sparkles,
   AlertTriangle,
-  CheckCircle,
   XCircle,
+  X,
 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { AdminRoleType } from '../../types/admin';
@@ -164,8 +155,21 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({
               setCurrentPage(1);
             }}
             placeholder="Search by name, username, email or phone..."
-            className="w-full rounded-xl bg-[#111b21] border border-[#202c33] pl-10 pr-4 py-2 text-xs text-white placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition"
+            className="w-full rounded-xl bg-[#111b21] border border-[#202c33] pl-10 pr-8 py-2 text-xs text-white placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -236,7 +240,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({
                         </span>
                       ) : u.isOnline ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                           Online
                         </span>
                       ) : (
@@ -245,10 +249,10 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-[#8696a0] hidden md:table-cell">
+                    <td className="py-3 px-4 text-[#8696a0] hidden md:table-cell tabular-nums">
                       {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                     </td>
-                    <td className="py-3 px-4 text-[#8696a0] hidden lg:table-cell">
+                    <td className="py-3 px-4 text-[#8696a0] hidden lg:table-cell tabular-nums">
                       {u.lastSeen ? new Date(u.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -301,9 +305,9 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({
         </div>
 
         {/* Pagination Bar */}
-        <div className="flex items-center justify-between p-4 border-t border-[#202c33] text-xs text-[#8696a0]">
+        <div className="flex items-center justify-between p-4 border-t border-[#202c33] text-xs text-[#8696a0] tabular-nums">
           <span>
-            Showing {Math.min(filteredUsers.length, (currentPage - 1) * pageSize + 1)} -{' '}
+            Showing {filteredUsers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} -{' '}
             {Math.min(filteredUsers.length, currentPage * pageSize)} of {filteredUsers.length} users
           </span>
           <div className="flex items-center gap-1.5">
@@ -314,7 +318,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({
             >
               Previous
             </button>
-            <span className="px-2 font-bold text-white">
+            <span className="px-2 font-bold text-white tabular-nums">
               {currentPage} / {totalPages}
             </span>
             <button

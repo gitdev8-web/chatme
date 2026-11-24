@@ -6,16 +6,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Lock,
-  Shield,
   Download,
   Search,
-  Filter,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Sparkles,
   RefreshCw,
   KeyRound,
+  X,
 } from 'lucide-react';
 import { AdminAuditLog, ROLE_PERMISSIONS, AdminRoleType } from '../../types/admin';
 import { getAdminAuditLogs } from '../../services/adminService';
@@ -163,8 +158,18 @@ export const AdminSecurityView: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search audit trail..."
-              className="w-full rounded-xl bg-[#111b21] border border-[#202c33] pl-9 pr-3 py-1.5 text-xs text-white placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none"
+              className="w-full rounded-xl bg-[#111b21] border border-[#202c33] pl-9 pr-8 py-1.5 text-xs text-white placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 

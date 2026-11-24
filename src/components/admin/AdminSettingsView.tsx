@@ -8,13 +8,6 @@ import {
   Sliders,
   Save,
   AlertTriangle,
-  Shield,
-  Sparkles,
-  Phone,
-  Video,
-  Clock,
-  HardDrive,
-  CheckCircle2,
 } from 'lucide-react';
 import { SystemSettings } from '../../types/admin';
 import { getSystemSettings, updateSystemSettings } from '../../services/adminService';

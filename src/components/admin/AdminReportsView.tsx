@@ -6,24 +6,16 @@
 import React, { useState } from 'react';
 import {
   AlertTriangle,
-  Search,
-  Filter,
   CheckCircle2,
-  XCircle,
-  Clock,
-  Shield,
-  MessageSquare,
   Ban,
-  FileText,
-  User,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import { ModerationReportItem } from '../../types/admin';
 import { updateReportStatus, updateUserStatus } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
 import { Modal } from '../common/Modal';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface AdminReportsViewProps {
   reports: ModerationReportItem[];
@@ -43,6 +35,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({
   const [selectedReport, setSelectedReport] = useState<ModerationReportItem | null>(null);
   const [moderatorNotes, setModeratorNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [suspendTarget, setSuspendTarget] = useState<ModerationReportItem | null>(null);
 
   const filtered = reports.filter((r) => {
     if (statusFilter === 'all') return true;
@@ -71,15 +64,16 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({
     }
   };
 
-  const handleQuickSuspend = async (targetUserId: string) => {
-    if (!user) return;
+  const handleConfirmSuspend = async () => {
+    if (!user || !suspendTarget) return;
     setActionLoading(true);
     try {
-      await updateUserStatus(targetUserId, true, {
+      await updateUserStatus(suspendTarget.reportedUserId, true, {
         id: user.uid,
         email: user.email || 'admin@devchat.app',
       });
       showToast('Reported user suspended', 'success');
+      setSuspendTarget(null);
       onRefresh();
     } catch {
       showToast('Failed to suspend user', 'error');
@@ -219,7 +213,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({
 
               <div className="pt-2 border-t border-[#202c33]/60 flex items-center justify-between">
                 <button
-                  onClick={() => handleQuickSuspend(r.reportedUserId)}
+                  onClick={() => setSuspendTarget(r)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition"
                 >
                   <Ban className="h-3.5 w-3.5" />
@@ -305,6 +299,21 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({
           </div>
         </Modal>
       )}
+
+      <ConfirmModal
+        isOpen={!!suspendTarget}
+        onClose={() => setSuspendTarget(null)}
+        onConfirm={handleConfirmSuspend}
+        title="Suspend Reported User"
+        description={
+          suspendTarget
+            ? `Suspend ${suspendTarget.reportedUserName || suspendTarget.reportedUserId} for "${suspendTarget.reason}"? They will lose access to messaging immediately.`
+            : ''
+        }
+        confirmText="Suspend User"
+        variant="danger"
+        loading={actionLoading}
+      />
     </div>
   );
 };

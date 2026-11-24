@@ -51,6 +51,8 @@ export interface Conversation {
   mutedBy?: string[];
   archivedBy?: string[];
   deletedForUsers?: string[];
+  clearedAt?: Record<string, string>;
+  disappearingDuration?: number; // seconds, 0 = off
   lastMessage?: LastMessageInfo;
   unreadCounts?: Record<string, number>;
 }
@@ -84,6 +86,7 @@ export interface Message {
   fileType?: string;
   audioDuration?: number;
   reactions?: Record<string, string[]>; // emoji: [uid1, uid2...]
+  starredBy?: string[];
   readBy?: string[];
   deliveredTo?: string[];
 }

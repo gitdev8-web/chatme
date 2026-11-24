@@ -63,7 +63,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const notify = useCallback(
     (payload: Omit<InAppNotificationPayload, 'id'>) => {
       const id = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      const fullPayload: InAppNotificationPayload = { ...payload, id };
+      const showPreviews =
+        typeof window === 'undefined' || localStorage.getItem('devchat_notif_previews') !== 'false';
+      const displayBody = showPreviews ? payload.body : 'New message received';
+      const fullPayload: InAppNotificationPayload = { ...payload, body: displayBody, id };
 
       // 1. Play audio chime
       sound.playReceive();
@@ -89,7 +92,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       ) {
         try {
           const nativeNotif = new Notification(payload.title, {
-            body: payload.body,
+            body: displayBody,
             icon: payload.icon || '/favicon.ico',
             tag: payload.conversationId || 'devchat-msg',
           });

@@ -14,13 +14,10 @@ import {
   Trash2,
   Download,
   FileText,
-  Play,
-  Pause,
-  CornerDownRight,
   Forward,
   Star,
   ChevronDown,
-  Camera,
+  Flag,
 } from 'lucide-react';
 import { Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
@@ -33,48 +30,57 @@ interface MessageBubbleProps {
   message: Message;
   isSelf: boolean;
   isGroup: boolean;
+  currentUserId: string;
   userCache: Record<string, UserProfile>;
+  isSearchMatch?: boolean;
+  isCurrentSearchMatch?: boolean;
   onReply: (msg: Message) => void;
   onEdit: (msg: Message) => void;
   onDelete: (messageId: string, forEveryone: boolean) => void;
   onReact: (messageId: string, emoji: string) => void;
+  onStar: (messageId: string, shouldStar: boolean) => void;
   onOpenMedia: (url: string, name?: string) => void;
   onScrollToMessage?: (messageId: string) => void;
   onForward?: (msg: Message) => void;
+  onReport?: (msg: Message) => void;
 }
 
 const COMMON_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-const PLAYBACK_SPEEDS = [1, 1.5, 2];
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   isSelf,
   isGroup,
+  currentUserId,
   userCache,
+  isSearchMatch = false,
+  isCurrentSearchMatch = false,
   onReply,
   onEdit,
   onDelete,
   onReact,
+  onStar,
   onOpenMedia,
   onScrollToMessage,
   onForward,
+  onReport,
 }) => {
   const { showToast } = useToast();
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isStarred, setIsStarred] = useState(false);
 
   // System message styling
   if (message.type === 'system') {
     return (
       <div className="flex justify-center my-3 select-none">
-        <span className="rounded-lg bg-[#182229] px-3 py-1 text-[11px] font-normal text-[#8696a0] shadow-sm">
+        <span className="rounded-lg bg-[#182229] border border-[#222d34]/70 px-3.5 py-1 text-[11px] font-medium text-[#8696a0] shadow-sm">
           {message.text}
         </span>
       </div>
     );
   }
 
+  const isStarred = message.starredBy?.includes(currentUserId) || false;
   const senderProfile = userCache[message.senderId];
   const senderName = message.senderName || senderProfile?.displayName || 'User';
 
@@ -94,7 +100,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     setShowActions(false);
   };
 
-  // Reactions summary
   const reactionsEntries = Object.entries(message.reactions || {}).filter(
     ([_, uids]) => Array.isArray(uids) && uids.length > 0
   );
@@ -107,7 +112,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         setShowActions(false);
         setShowEmojiPicker(false);
       }}
-      className={`group relative flex gap-2 my-1 px-1 sm:px-2 transition-all select-none ${
+      className={`group relative flex gap-2 my-1.5 px-1 sm:px-2 transition-all select-none ${
         isSelf ? 'justify-end' : 'justify-start'
       }`}
     >
@@ -123,78 +128,122 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       {/* Bubble Container */}
       <div className={`relative max-w-[85%] sm:max-w-md ${isSelf ? 'items-end' : 'items-start'}`}>
-        {/* Floating Quick Action Toolbar */}
+        {/* Floating Quick Action Toolbar (hover on desktop, tap chevron on mobile) */}
         {showActions && !message.isDeleted && (
           <div
-            className={`absolute -top-9 z-20 flex items-center gap-1 rounded-xl border border-[#222d34] bg-[#233138] px-2 py-1 shadow-xl backdrop-blur-md animate-in fade-in ${
+            className={`absolute -top-10 z-20 flex items-center gap-0.5 rounded-xl border border-[#222d34] bg-[#233138] px-2 py-1 shadow-xl backdrop-blur-md animate-in fade-in ${
               isSelf ? 'right-0' : 'left-0'
             }`}
           >
             {/* Quick Reactions */}
-            <div className="flex items-center gap-1 pr-1 border-r border-[#374248]">
+            <div className="flex items-center gap-0.5 pr-1 border-r border-[#374248]">
               {COMMON_EMOJIS.slice(0, 4).map((emoji) => (
                 <button
                   key={emoji}
-                  onClick={() => onReact(message.id, emoji)}
-                  className="p-1 text-sm hover:scale-130 transition-transform"
+                  type="button"
+                  onClick={() => {
+                    onReact(message.id, emoji);
+                    setShowActions(false);
+                  }}
+                  className="p-1 text-sm hover:scale-125 transition-transform"
                 >
                   {emoji}
                 </button>
               ))}
               <button
+                type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="p-1 text-[#8696a0] hover:text-white"
+                className="p-1.5 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
                 title="More Reactions"
               >
                 <Smile className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {/* Actions */}
             <button
-              onClick={() => onReply(message)}
-              className="p-1 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
+              type="button"
+              onClick={() => {
+                onReply(message);
+                setShowActions(false);
+              }}
+              className="p-1.5 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
               title="Reply"
             >
               <Reply className="h-3.5 w-3.5" />
             </button>
+
             {onForward && (
               <button
-                onClick={() => onForward(message)}
-                className="p-1 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
+                type="button"
+                onClick={() => {
+                  onForward(message);
+                  setShowActions(false);
+                }}
+                className="p-1.5 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
                 title="Forward"
               >
                 <Forward className="h-3.5 w-3.5" />
               </button>
             )}
+
             <button
-              onClick={() => setIsStarred(!isStarred)}
-              className={`p-1 rounded hover:bg-[#182229] transition ${
+              type="button"
+              onClick={() => {
+                onStar(message.id, !isStarred);
+                setShowActions(false);
+              }}
+              className={`p-1.5 rounded hover:bg-[#182229] transition ${
                 isStarred ? 'text-[#ffd279]' : 'text-[#8696a0] hover:text-white'
               }`}
-              title={isStarred ? 'Unstar' : 'Star'}
+              title={isStarred ? 'Unstar message' : 'Star message'}
             >
-              <Star className="h-3.5 w-3.5 fill-current" />
+              <Star className={`h-3.5 w-3.5 ${isStarred ? 'fill-current' : ''}`} />
             </button>
+
             <button
+              type="button"
               onClick={handleCopy}
-              className="p-1 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
-              title="Copy"
+              className="p-1.5 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
+              title="Copy text"
             >
               <Copy className="h-3.5 w-3.5" />
             </button>
+
             {isSelf && message.type === 'text' && (
               <button
-                onClick={() => onEdit(message)}
-                className="p-1 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
+                type="button"
+                onClick={() => {
+                  onEdit(message);
+                  setShowActions(false);
+                }}
+                className="p-1.5 text-[#8696a0] hover:text-white rounded hover:bg-[#182229] transition"
                 title="Edit"
               >
                 <Edit2 className="h-3.5 w-3.5" />
               </button>
             )}
+
+            {!isSelf && onReport && (
+              <button
+                type="button"
+                onClick={() => {
+                  onReport(message);
+                  setShowActions(false);
+                }}
+                className="p-1.5 text-[#8696a0] hover:text-amber-400 rounded hover:bg-[#182229] transition"
+                title="Report message"
+              >
+                <Flag className="h-3.5 w-3.5" />
+              </button>
+            )}
+
             <button
-              onClick={() => onDelete(message.id, isSelf)}
-              className="p-1 text-[#8696a0] hover:text-rose-400 rounded hover:bg-[#182229] transition"
+              type="button"
+              onClick={() => {
+                onDelete(message.id, isSelf);
+                setShowActions(false);
+              }}
+              className="p-1.5 text-[#8696a0] hover:text-rose-400 rounded hover:bg-[#182229] transition"
               title={isSelf ? 'Delete message' : 'Delete for me'}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -205,16 +254,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Emoji Bar Picker */}
         {showEmojiPicker && (
           <div
-            className={`absolute -top-16 z-30 flex items-center gap-2 rounded-2xl border border-[#222d34] bg-[#233138] p-2 shadow-2xl backdrop-blur-md ${
+            className={`absolute -top-20 z-30 flex items-center gap-1.5 rounded-2xl border border-[#222d34] bg-[#233138] p-2 shadow-2xl backdrop-blur-md ${
               isSelf ? 'right-0' : 'left-0'
             }`}
           >
             {['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉'].map((emoji) => (
               <button
                 key={emoji}
+                type="button"
                 onClick={() => {
                   onReact(message.id, emoji);
                   setShowEmojiPicker(false);
+                  setShowActions(false);
                 }}
                 className="hover:scale-125 transition-transform p-1 rounded-xl hover:bg-[#111b21]"
               >
@@ -226,17 +277,40 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
         {/* Message Bubble */}
         <div
-          className={`relative rounded-lg px-3 py-1.5 shadow-md transition-colors ${
+          className={`relative rounded-xl px-3 py-2 shadow-md transition-all ${
             message.isDeleted
               ? 'italic border border-[#222d34] bg-[#182229] text-[#8696a0]'
               : isSelf
               ? 'bg-[#005c4b] text-[#e9edef] rounded-tr-none bubble-outgoing-tail'
               : 'bg-[#202c33] text-[#e9edef] rounded-tl-none bubble-incoming-tail'
+          } ${
+            isCurrentSearchMatch
+              ? 'ring-2 ring-[#25d366] shadow-[0_0_16px_rgba(37,211,102,0.3)]'
+              : isSearchMatch
+              ? 'ring-1 ring-[#25d366]/60'
+              : ''
           }`}
         >
+          {/* Touch / Mobile Menu Chevron */}
+          {!message.isDeleted && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActions((prev) => !prev);
+              }}
+              aria-label="Message actions"
+              className={`absolute top-1.5 right-1.5 rounded-md p-0.5 opacity-60 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition ${
+                isSelf ? 'text-white/80 hover:bg-black/20' : 'text-[#8696a0] hover:bg-black/20 hover:text-[#e9edef]'
+              }`}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          )}
+
           {/* Sender header in groups */}
           {!isSelf && isGroup && (
-            <div className="mb-0.5 text-xs font-semibold text-[#53bdeb]">
+            <div className="mb-1 text-xs font-semibold text-[#53bdeb] pr-5">
               {senderName}
             </div>
           )}
@@ -245,16 +319,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {message.replyTo && (
             <div
               onClick={() => onScrollToMessage && onScrollToMessage(message.replyTo!.messageId)}
-              className={`mb-1.5 flex items-start gap-1.5 rounded-md border-l-4 p-1.5 text-xs cursor-pointer select-none transition ${
+              className={`mb-1.5 flex items-start gap-1.5 rounded-lg border-l-2 p-2 text-xs cursor-pointer select-none transition ${
                 isSelf
-                  ? 'border-[#00a884] bg-[#025143]/70 text-[#e9edef] hover:bg-[#025143]'
-                  : 'border-[#53bdeb] bg-[#111b21] text-[#8696a0] hover:bg-[#0b141a]'
+                  ? 'border-[#25d366] bg-[#025143]/75 text-[#e9edef] hover:bg-[#025143]'
+                  : 'border-[#53bdeb] bg-[#111b21]/90 text-[#8696a0] hover:bg-[#0b141a]'
               }`}
             >
               <div className="truncate">
                 <span
                   className={`font-semibold block text-[11px] ${
-                    isSelf ? 'text-[#00a884]' : 'text-[#53bdeb]'
+                    isSelf ? 'text-[#25d366]' : 'text-[#53bdeb]'
                   }`}
                 >
                   {message.replyTo.senderName}
@@ -268,7 +342,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           {/* Deleted State */}
           {message.isDeleted ? (
-            <span className="text-xs">🚫 This message was deleted</span>
+            <span className="text-xs">This message was deleted</span>
           ) : (
             <>
               {/* Photo / Video Attachment */}
@@ -282,7 +356,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     loading="lazy"
                   />
                   {message.text && (
-                    <p className="mt-1 text-xs text-[#e9edef]">{message.text}</p>
+                    <p className="mt-1.5 text-[13px] text-[#e9edef]">{message.text}</p>
                   )}
                 </div>
               )}
@@ -293,7 +367,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   onClick={() => onOpenMedia(message.fileUrl!, message.fileName)}
                   className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition ${
                     isSelf
-                      ? 'border-white/10 bg-black/20 hover:bg-black/30'
+                      ? 'border-white/15 bg-black/20 hover:bg-black/30'
                       : 'border-[#222d34] bg-[#111b21] hover:bg-[#182229]'
                   }`}
                 >
@@ -305,7 +379,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       {message.fileName || 'Document'}
                     </p>
                     {message.fileSize && (
-                      <p className="text-[10px] text-[#8696a0]">
+                      <p className="tabular-nums text-[10px] text-[#8696a0]">
                         {(message.fileSize / 1024).toFixed(1)} KB
                       </p>
                     )}
@@ -328,22 +402,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
               {/* Text Message with 3D Emojis */}
               {message.text && message.type === 'text' && (
-                <div className="text-xs leading-relaxed whitespace-pre-wrap break-words pr-14">
+                <div className="text-[13px] leading-relaxed whitespace-pre-wrap break-words pr-6">
                   <RenderMessage3DEmojis text={message.text} />
                 </div>
               )}
             </>
           )}
 
-          {/* Bottom Right Metadata: Time + Star + Double Ticks */}
-          <div className="flex items-center justify-end gap-1 text-[10px] text-[#8696a0] mt-0.5 -mb-0.5 ml-auto float-right">
+          {/* Bottom Right Metadata */}
+          <div className="flex items-center justify-end gap-1 text-[10px] text-[#8696a0] mt-1 tabular-nums">
             {isStarred && (
               <Star className="h-2.5 w-2.5 fill-current text-[#ffd279]" />
             )}
             {message.isEdited && <span className="text-[9px]">Edited •</span>}
             <span>{formatTime(message.createdAt)}</span>
 
-            {/* Read/Delivery Receipts (Double Ticks) */}
             {isSelf && (
               <span className="inline-flex items-center ml-0.5">
                 {message.readBy && message.readBy.length > 1 ? (
@@ -368,11 +441,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {reactionsEntries.map(([emoji, uids]) => (
               <button
                 key={emoji}
+                type="button"
                 onClick={() => onReact(message.id, emoji)}
                 className="flex items-center gap-1 rounded-full border border-[#222d34] bg-[#202c33] px-2 py-0.5 text-xs shadow-sm hover:scale-105 active:scale-95 transition"
               >
                 <Emoji3DImage char={emoji} size="sm" />
-                <span className="text-[10px] font-semibold text-[#8696a0]">
+                <span className="tabular-nums text-[10px] font-semibold text-[#8696a0]">
                   {uids.length}
                 </span>
               </button>

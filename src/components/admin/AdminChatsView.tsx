@@ -9,13 +9,8 @@ import {
   Search,
   Users,
   Lock,
-  Shield,
   Layers,
-  Calendar,
-  Clock,
-  ExternalLink,
-  Sparkles,
-  Info,
+  X,
 } from 'lucide-react';
 import { Conversation } from '../../types';
 import { getAdminConversations } from '../../services/adminService';
@@ -115,8 +110,18 @@ export const AdminChatsView: React.FC<AdminChatsViewProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search conversations by space name or ID..."
-            className="w-full rounded-xl bg-[#111b21] border border-[#202c33] pl-10 pr-4 py-2 text-xs text-white placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition"
+            className="w-full rounded-xl bg-[#111b21] border border-[#202c33] pl-10 pr-8 py-2 text-xs text-white placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

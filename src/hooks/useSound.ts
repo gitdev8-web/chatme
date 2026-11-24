@@ -18,7 +18,13 @@ class SoundService {
     }
   }
 
+  private isSoundEnabled(): boolean {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('devchat_sounds') !== 'false';
+  }
+
   playSend() {
+    if (!this.isSoundEnabled()) return;
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -39,6 +45,7 @@ class SoundService {
   }
 
   playReceive() {
+    if (!this.isSoundEnabled()) return;
     try {
       this.initCtx();
       if (!this.ctx) return;
@@ -59,6 +66,7 @@ class SoundService {
   }
 
   playPop() {
+    if (!this.isSoundEnabled()) return;
     try {
       this.initCtx();
       if (!this.ctx) return;

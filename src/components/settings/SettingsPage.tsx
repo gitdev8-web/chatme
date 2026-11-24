@@ -13,21 +13,18 @@ import {
   Lock,
   LogOut,
   Trash2,
-  Check,
-  Ban,
   Settings,
   ArrowLeft,
   Sparkles,
-  Smartphone,
   Info,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { useTheme } from '../../context/ThemeContext';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { useToast } from '../common/Toast';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { Avatar } from '../common/Avatar';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface SettingsPageProps {
   onBackMobile?: () => void;
@@ -42,12 +39,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const { user, profile, updateProfileData, logout, deleteAccount, resetPassword } = useAuth();
   const { permission, requestPermission } = useNotifications();
-  const { theme } = useTheme();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<TabType>('account');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [soundsEnabled, setSoundsEnabled] = useState<boolean>(
+    () => typeof window === 'undefined' || localStorage.getItem('devchat_sounds') !== 'false'
+  );
+  const [previewsEnabled, setPreviewsEnabled] = useState<boolean>(
+    () => typeof window === 'undefined' || localStorage.getItem('devchat_notif_previews') !== 'false'
+  );
 
   const handleToggle = async (key: string, value: boolean) => {
     try {
@@ -56,6 +60,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     } catch {
       showToast('Failed to update setting', 'error');
     }
+  };
+
+  const handleSoundsToggle = (checked: boolean) => {
+    setSoundsEnabled(checked);
+    localStorage.setItem('devchat_sounds', String(checked));
+    showToast(checked ? 'Notification sounds enabled' : 'Notification sounds muted', 'info');
+  };
+
+  const handlePreviewsToggle = (checked: boolean) => {
+    setPreviewsEnabled(checked);
+    localStorage.setItem('devchat_notif_previews', String(checked));
+    showToast(checked ? 'Message previews enabled' : 'Message previews hidden', 'info');
   };
 
   const handlePasswordReset = async () => {
@@ -85,6 +101,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       showToast(msg, 'error');
     } finally {
       setDeleteLoading(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -95,24 +112,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         <div className="flex items-center gap-3">
           {onBackMobile && (
             <button
+              type="button"
               onClick={onBackMobile}
-              className="md:hidden rounded-full p-1.5 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+              className="md:hidden flex h-10 w-10 items-center justify-center rounded-full text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
               title="Back"
+              aria-label="Back to chats"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex items-center gap-2">
-            <Settings className="h-6 w-6 text-[#00a884]" />
+          <div className="flex items-center gap-2.5">
+            <Settings className="h-5 w-5 text-[#00a884]" />
             <h1 className="text-lg font-semibold text-[#e9edef]">Settings</h1>
           </div>
         </div>
       </div>
 
       {/* Main Container */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-5xl mx-auto w-full pb-20 md:pb-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-5xl mx-auto w-full pb-24 md:pb-8 space-y-6">
         {/* User Profile Summary Card */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-3xl bg-[#111b21] border border-[#222d34] shadow-xl">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[#111b21] border border-[#222d34] shadow-xl">
           <div className="flex items-center gap-4 text-center sm:text-left min-w-0">
             <Avatar
               src={profile?.photoURL}
@@ -135,8 +154,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {onOpenProfile && (
             <button
+              type="button"
               onClick={onOpenProfile}
-              className="rounded-full bg-[#00a884] px-5 py-2 text-xs font-bold text-[#111b21] hover:bg-[#06cf9c] transition shadow-md whitespace-nowrap"
+              className="rounded-xl bg-[#00a884] px-5 py-2.5 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-md whitespace-nowrap"
             >
               Edit Profile
             </button>
@@ -161,10 +181,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-xs font-semibold transition text-left whitespace-nowrap ${
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-semibold transition text-left whitespace-nowrap ${
                     isActive
-                      ? 'bg-[#00a884] text-[#111b21] shadow-md'
+                      ? 'bg-[#00a884] text-[#0b141a] shadow-md'
                       : 'bg-[#111b21] text-[#8696a0] hover:bg-[#202c33] hover:text-[#e9edef] border border-[#222d34]'
                   }`}
                 >
@@ -176,32 +197,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
 
           {/* Active Settings Panel */}
-          <div className="flex-1 w-full bg-[#111b21] border border-[#222d34] rounded-3xl p-5 md:p-6 shadow-xl space-y-5">
-            {/* Account Tab */}
+          <div className="flex-1 w-full bg-[#111b21] border border-[#222d34] rounded-2xl p-5 md:p-6 shadow-xl space-y-5">
             {activeTab === 'account' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Account Details
                 </h3>
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] space-y-2">
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] space-y-1.5">
                   <span className="text-xs text-[#8696a0] block">Email Address</span>
                   <p className="text-xs font-mono font-semibold text-[#e9edef]">{user?.email || 'N/A'}</p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Password Management</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">Send password reset email to your inbox</p>
                   </div>
                   <button
+                    type="button"
                     onClick={handlePasswordReset}
-                    className="rounded-xl bg-[#2a3942] px-4 py-2 text-xs font-semibold text-[#e9edef] hover:bg-[#32434d] transition shadow-sm"
+                    className="rounded-xl bg-[#2a3942] px-4 py-2 text-xs font-semibold text-[#e9edef] hover:bg-[#32434d] transition shadow-sm whitespace-nowrap"
                   >
                     Reset Password
                   </button>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Progressive Web App (PWA)</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">Install DEV CHAT for home screen & offline access</p>
@@ -211,14 +232,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             )}
 
-            {/* Privacy Tab */}
             {activeTab === 'privacy' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Privacy Preferences
                 </h3>
 
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34]">
+                <label className="flex items-center justify-between p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] cursor-pointer">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Show Online Presence</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
@@ -231,9 +251,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     onChange={(e) => handleToggle('showOnlineStatus', e.target.checked)}
                     className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
                   />
-                </div>
+                </label>
 
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34]">
+                <label className="flex items-center justify-between p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] cursor-pointer">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Show Last Seen</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
@@ -246,9 +266,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     onChange={(e) => handleToggle('showLastSeen', e.target.checked)}
                     className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
                   />
-                </div>
+                </label>
 
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34]">
+                <label className="flex items-center justify-between p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] cursor-pointer">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Read Receipts</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
@@ -261,11 +281,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     onChange={(e) => handleToggle('readReceipts', e.target.checked)}
                     className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
                   />
-                </div>
+                </label>
 
-                {/* Blocked accounts list */}
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] space-y-2">
-                  <h4 className="text-xs font-bold text-[#e9edef]">
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] space-y-2">
+                  <h4 className="tabular-nums text-xs font-bold text-[#e9edef]">
                     Blocked Users ({profile?.blockedUserIds?.length || 0})
                   </h4>
                   {profile?.blockedUserIds && profile.blockedUserIds.length > 0 ? (
@@ -279,6 +298,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             User ID: {uid.slice(0, 12)}...
                           </span>
                           <button
+                            type="button"
                             onClick={() => handleUnblock(uid)}
                             className="text-xs text-rose-400 hover:underline font-semibold"
                           >
@@ -294,17 +314,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             )}
 
-            {/* Theme Tab */}
             {activeTab === 'theme' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Appearance
                 </h3>
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Theme Mode</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
-                      Toggle between Dark and Light mode interface
+                      Switch between Dark and Light mode interface
                     </p>
                   </div>
                   <ThemeToggle showLabel={true} />
@@ -312,25 +331,43 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             )}
 
-            {/* Notifications Tab */}
             {activeTab === 'notifications' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Notifications & Audio
                 </h3>
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between">
+
+                <label className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between cursor-pointer">
                   <div>
-                    <h4 className="text-xs font-bold text-[#e9edef]">In-App Toast Alerts & Sounds</h4>
+                    <h4 className="text-xs font-bold text-[#e9edef]">In-App Sound Effects</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
-                      Real-time message toasts and notification sound chimes
+                      Play audio chimes on incoming and outgoing messages
                     </p>
                   </div>
-                  <span className="text-xs text-[#25d366] font-bold bg-[#00a884]/20 px-3 py-1 rounded-lg">
-                    Active
-                  </span>
-                </div>
+                  <input
+                    type="checkbox"
+                    checked={soundsEnabled}
+                    onChange={(e) => handleSoundsToggle(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
+                  />
+                </label>
 
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between">
+                <label className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between cursor-pointer">
+                  <div>
+                    <h4 className="text-xs font-bold text-[#e9edef]">Message Text Previews</h4>
+                    <p className="text-[11px] text-[#8696a0] mt-0.5">
+                      Include message content in toast banners and push alerts
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={previewsEnabled}
+                    onChange={(e) => handlePreviewsToggle(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
+                  />
+                </label>
+
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Browser Push Alerts</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
@@ -338,16 +375,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     </p>
                   </div>
                   {permission === 'granted' ? (
-                    <span className="text-xs text-[#25d366] font-bold bg-[#00a884]/20 px-3 py-1 rounded-lg">
+                    <span className="text-xs text-[#25d366] font-bold bg-[#00a884]/20 px-3 py-1.5 rounded-lg">
                       Granted
                     </span>
                   ) : (
                     <button
+                      type="button"
                       onClick={async () => {
                         const res = await requestPermission();
                         showToast(`Browser push permission: ${res}`, res === 'granted' ? 'success' : 'info');
                       }}
-                      className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#111b21] hover:bg-[#06cf9c] transition shadow-md"
+                      className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-md"
                     >
                       Enable Push
                     </button>
@@ -356,13 +394,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             )}
 
-            {/* Chat Settings Tab */}
             {activeTab === 'chat' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Chat Settings
                 </h3>
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34]">
+                <label className="flex items-center justify-between p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] cursor-pointer">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Press Enter to Send</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">
@@ -375,38 +412,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     onChange={(e) => handleToggle('enterToSend', e.target.checked)}
                     className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
                   />
-                </div>
+                </label>
               </div>
             )}
 
-            {/* Security Tab */}
             {activeTab === 'security' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Session & Account Security
                 </h3>
-                <div className="p-4 rounded-2xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Sign Out</h4>
                     <p className="text-[11px] text-[#8696a0] mt-0.5">Log out of your current session on this device</p>
                   </div>
                   <button
-                    onClick={async () => {
-                      await logout();
-                    }}
-                    className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition"
+                    type="button"
+                    onClick={() => setShowLogoutConfirm(true)}
+                    className="flex items-center gap-2 rounded-xl bg-[#2a3942] px-4 py-2 text-xs font-bold text-[#e9edef] hover:bg-[#374248] transition"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>
                   </button>
                 </div>
 
-                <div className="p-4 rounded-2xl border border-rose-900/40 bg-rose-950/20 flex items-center justify-between">
+                <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-rose-400">Delete Account</h4>
                     <p className="text-[11px] text-rose-300/80 mt-0.5">Permanently delete your user profile and access</p>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setShowDeleteConfirm(true)}
                     className="flex items-center gap-2 rounded-xl bg-rose-600/20 border border-rose-500/40 px-4 py-2 text-xs font-bold text-rose-300 hover:bg-rose-600 hover:text-white transition"
                   >
@@ -414,40 +450,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span>Delete</span>
                   </button>
                 </div>
-
-                {showDeleteConfirm && (
-                  <div className="p-4 rounded-2xl border border-rose-500/50 bg-rose-950/60 space-y-3 animate-in fade-in">
-                    <p className="text-xs text-rose-200">
-                      Are you sure you want to delete your account? This action is permanent and cannot be undone.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleDeleteAccount}
-                        disabled={deleteLoading}
-                        className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500 disabled:opacity-50 transition"
-                      >
-                        {deleteLoading ? 'Deleting...' : 'Yes, Delete My Account'}
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="rounded-xl bg-slate-800 px-4 py-2 text-xs text-slate-300 hover:bg-slate-700"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* About & Info Tab */}
             {activeTab === 'about' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   About DEV CHAT
                 </h3>
 
-                <div className="p-5 rounded-2xl bg-[#202c33]/60 border border-[#222d34] space-y-3 text-center sm:text-left">
+                <div className="p-5 rounded-xl bg-[#202c33]/60 border border-[#222d34] space-y-3 text-center sm:text-left">
                   <div className="flex flex-col sm:flex-row items-center gap-3">
                     <img
                       src="/logo.png"
@@ -477,14 +489,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-        {/* Developer Credit Footer */}
-        <div className="pt-8 text-center text-xs text-[#8696a0]/70 flex flex-col items-center justify-center gap-1 border-t border-[#222d34]/40 mt-8">
-          <div className="flex items-center gap-1.5 font-medium text-[#8696a0]">
-            <Sparkles className="h-3.5 w-3.5 text-[#00a884]" />
-            <span>DEV CHAT • Developed with ❤️ by <strong className="text-[#00a884]">lawrencedev</strong></span>
-          </div>
+        {/* Footer */}
+        <div className="pt-6 text-center text-xs text-[#8696a0]/70 flex items-center justify-center gap-1.5 border-t border-[#222d34]/40 mt-8">
+          <Sparkles className="h-3.5 w-3.5 text-[#00a884]" />
+          <span>DEV CHAT • Developed by <strong className="text-[#00a884]">lawrencedev</strong></span>
         </div>
       </div>
+
+      {/* Logout Confirm Modal */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={async () => {
+          setShowLogoutConfirm(false);
+          await logout();
+        }}
+        title="Log out of DEV CHAT?"
+        description="You will need to sign back in to continue messaging."
+        confirmText="Log out"
+        variant="warning"
+      />
+
+      {/* Delete Account Confirm Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        loading={deleteLoading}
+        onConfirm={handleDeleteAccount}
+        title="Permanently delete account?"
+        description="This action cannot be undone. Your profile, preferences, and session access will be removed."
+        confirmText="Delete account"
+        variant="danger"
+      />
     </div>
   );
 };

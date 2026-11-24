@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Camera, AtSign, User, FileText, Check, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Camera, AtSign, User, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
 import { Avatar } from '../common/Avatar';
@@ -41,6 +41,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+
+  // Sync fields cleanly whenever modal opens or profile updates
+  useEffect(() => {
+    if (isOpen && profile) {
+      setDisplayName(profile.displayName || '');
+      setUsername(profile.username || '');
+      setBio(profile.bio || '');
+      setStatus(profile.status || 'Available');
+      setPhotoURL(profile.photoURL || '');
+      setAvatarFile(null);
+      setAvatarPreview('');
+      setError(null);
+      setUsernameStatus('idle');
+    }
+  }, [isOpen, profile]);
 
   const handleUsernameChange = async (val: string) => {
     const cleaned = val.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 30);
@@ -139,7 +154,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           </div>
         )}
 
-        {/* Avatar Upload */}
         <div className="flex flex-col items-center justify-center">
           <div className="relative group cursor-pointer">
             <Avatar
@@ -157,68 +171,65 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               />
             </label>
           </div>
-          <span className="text-[11px] text-slate-400 mt-2">Tap photo to change avatar</span>
+          <span className="text-[11px] text-[#8696a0] mt-2">Tap photo to change avatar</span>
         </div>
 
-        {/* Display Name & Username */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300">Display Name</label>
+            <label className="text-xs font-medium text-[#e9edef]">Display Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
               <input
                 type="text"
                 required
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 pl-9 pr-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] focus:border-[#00a884] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
               />
             </div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-slate-300">Username</label>
+              <label className="text-xs font-medium text-[#e9edef]">Username</label>
               {usernameStatus === 'available' && (
-                <span className="text-[10px] text-emerald-400">Available</span>
+                <span className="text-[10px] text-[#25d366]">Available</span>
               )}
               {usernameStatus === 'taken' && (
                 <span className="text-[10px] text-rose-400">Taken</span>
               )}
             </div>
             <div className="relative">
-              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => handleUsernameChange(e.target.value)}
-                className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 pl-9 pr-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] focus:border-[#00a884] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
               />
             </div>
           </div>
         </div>
 
-        {/* Bio */}
         <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-300">Bio</label>
+          <label className="text-xs font-medium text-[#e9edef]">Bio</label>
           <textarea
             rows={2}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             maxLength={140}
-            className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 p-2.5 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-xl border border-[#222d34] bg-[#202c33] p-2.5 text-xs text-[#e9edef] focus:border-[#00a884] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
           />
         </div>
 
-        {/* Status Presets */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-300">Status Message</label>
+          <label className="text-xs font-medium text-[#e9edef]">Status Message</label>
           <input
             type="text"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 mb-2"
+            className="w-full rounded-xl border border-[#222d34] bg-[#202c33] px-3 py-2 text-xs text-[#e9edef] focus:border-[#00a884] focus:outline-none focus:ring-1 focus:ring-[#00a884] mb-2"
           />
           <div className="flex flex-wrap gap-1.5">
             {STATUS_PRESETS.map((preset) => (
@@ -228,8 +239,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 onClick={() => setStatus(preset)}
                 className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
                   status === preset
-                    ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
-                    : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+                    ? 'bg-[#00a884]/20 text-[#25d366] ring-1 ring-[#00a884]/40'
+                    : 'bg-[#202c33] text-[#8696a0] hover:text-[#e9edef]'
                 }`}
               >
                 {preset}
@@ -242,14 +253,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-800 px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 transition"
+            className="rounded-xl bg-[#202c33] px-4 py-2 text-xs font-medium text-[#8696a0] hover:text-[#e9edef] transition"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-semibold text-white shadow-md hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 transition"
+            className="rounded-xl bg-[#00a884] px-5 py-2 text-xs font-bold text-[#0b141a] shadow-md hover:bg-[#06cf9c] disabled:opacity-50 transition"
           >
             {saving ? 'Saving...' : 'Save Changes'}
           </button>

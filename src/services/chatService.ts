@@ -77,6 +77,14 @@ export async function getOrCreateDirectConversation(
     const snap = await getDoc(convRef);
     if (!snap.exists()) {
       await setDoc(convRef, sanitizeForFirestore(initialConv), { merge: true });
+    } else {
+      const existing = snap.data() as Conversation;
+      if (existing.deletedForUsers?.includes(currentUid)) {
+        await updateDoc(convRef, {
+          deletedForUsers: arrayRemove(currentUid),
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
     return conversationId;
   } catch (err) {
@@ -228,6 +236,7 @@ export async function sendMessage(
           convRef,
           {
             updatedAt: now,
+            deletedForUsers: [],
             lastMessage: {
               id: messageId,
               text: previewText,
@@ -594,3 +603,56 @@ export async function submitReport(
     handleFirestoreError(err, OperationType.WRITE, `reports/${reportId}`);
   }
 }
+
+export async function toggleStarMessage(
+  conversationId: string,
+  messageId: string,
+  uid: string,
+  shouldStar: boolean
+): Promise<void> {
+  const msgRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+  try {
+    await updateDoc(msgRef, {
+      starredBy: shouldStar ? arrayUnion(uid) : arrayRemove(uid),
+    });
+  } catch (err) {
+    handleFirestoreError(
+      err,
+      OperationType.UPDATE,
+      `conversations/${conversationId}/messages/${messageId}`
+    );
+  }
+}
+
+export async function clearChatForUser(
+  conversationId: string,
+  currentUid: string
+): Promise<void> {
+  if (!conversationId || !currentUid) return;
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    const clearedTimestamp = new Date().toISOString();
+    await updateDoc(convRef, {
+      [`clearedAt.${currentUid}`]: clearedTimestamp,
+      [`unreadCounts.${currentUid}`]: 0,
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `conversations/${conversationId}`);
+  }
+}
+
+export async function updateDisappearingMessages(
+  conversationId: string,
+  durationSeconds: number
+): Promise<void> {
+  const convRef = doc(db, 'conversations', conversationId);
+  try {
+    await updateDoc(convRef, {
+      disappearingDuration: durationSeconds,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `conversations/${conversationId}`);
+  }
+}
+

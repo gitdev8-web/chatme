@@ -7,14 +7,9 @@ import React, { useState, useEffect } from 'react';
 import {
   PhoneCall,
   Video,
-  PhoneIncoming,
   PhoneMissed,
-  Clock,
   Activity,
   ShieldCheck,
-  Search,
-  Sparkles,
-  Info,
 } from 'lucide-react';
 import { CallSession } from '../../types';
 import { getAdminCalls } from '../../services/adminService';
@@ -89,7 +84,7 @@ export const AdminCallsView: React.FC = () => {
             <span className="text-xs font-semibold text-[#8696a0]">Total Calls</span>
             <PhoneCall className="h-4 w-4 text-[#00a884]" />
           </div>
-          <h3 className="text-2xl font-bold text-white">{calls.length}</h3>
+          <h3 className="text-2xl font-bold text-white tabular-nums">{calls.length}</h3>
           <p className="text-[11px] text-[#8696a0]">All recorded sessions</p>
         </div>
 
@@ -98,10 +93,10 @@ export const AdminCallsView: React.FC = () => {
             <span className="text-xs font-semibold text-[#8696a0]">Completed Rate</span>
             <Activity className="h-4 w-4 text-emerald-400" />
           </div>
-          <h3 className="text-2xl font-bold text-emerald-400">
+          <h3 className="text-2xl font-bold text-emerald-400 tabular-nums">
             {calls.length > 0 ? `${Math.round((totalAccepted / calls.length) * 100)}%` : '100%'}
           </h3>
-          <p className="text-[11px] text-[#8696a0]">{totalAccepted} answered</p>
+          <p className="text-[11px] text-[#8696a0] tabular-nums">{totalAccepted} answered</p>
         </div>
 
         <div className="p-4 rounded-2xl bg-[#0c1317] border border-[#202c33] space-y-1">
@@ -109,7 +104,7 @@ export const AdminCallsView: React.FC = () => {
             <span className="text-xs font-semibold text-[#8696a0]">Voice / Video Ratio</span>
             <Video className="h-4 w-4 text-purple-400" />
           </div>
-          <h3 className="text-2xl font-bold text-white">{totalAudio} : {totalVideo}</h3>
+          <h3 className="text-2xl font-bold text-white tabular-nums">{totalAudio} : {totalVideo}</h3>
           <p className="text-[11px] text-[#8696a0]">Audio vs Video</p>
         </div>
 
@@ -118,7 +113,7 @@ export const AdminCallsView: React.FC = () => {
             <span className="text-xs font-semibold text-[#8696a0]">Missed / Rejected</span>
             <PhoneMissed className="h-4 w-4 text-rose-400" />
           </div>
-          <h3 className="text-2xl font-bold text-rose-400">{totalMissed}</h3>
+          <h3 className="text-2xl font-bold text-rose-400 tabular-nums">{totalMissed}</h3>
           <p className="text-[11px] text-[#8696a0]">Unanswered sessions</p>
         </div>
       </div>
@@ -199,7 +194,7 @@ export const AdminCallsView: React.FC = () => {
                         {call.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-[#8696a0] font-mono text-[11px]">
+                    <td className="py-3 px-4 text-[#8696a0] font-mono text-[11px] tabular-nums">
                       {call.createdAt ? new Date(call.createdAt).toLocaleString() : '—'}
                     </td>
                   </tr>

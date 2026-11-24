@@ -8,17 +8,17 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Eye,
   Trash2,
   Send,
-  Heart,
-  Smile,
 } from 'lucide-react';
 import { UserStatusStory } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import { markStoryAsViewed, deleteStatusStory } from '../../services/statusService';
 import { Avatar } from '../common/Avatar';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface StatusViewerModalProps {
   isOpen: boolean;
@@ -36,12 +36,14 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
   onStoryDeleted,
 }) => {
   const { user } = useAuth();
-  const { startDirectChat, sendTextMessage } = useChat();
+  const { startDirectChat, sendTextMessage, userCache } = useChat();
   const [currentIndex, setCurrentIndex] = useState(initialStoryIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showViewers, setShowViewers] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentStory = stories[currentIndex];
@@ -50,6 +52,8 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
   useEffect(() => {
     setCurrentIndex(initialStoryIndex);
     setProgress(0);
+    setShowViewers(false);
+    setShowDeleteConfirm(false);
   }, [initialStoryIndex, isOpen]);
 
   // Mark current story as viewed
@@ -61,9 +65,9 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
 
   // Slide progress timer (5 seconds per slide)
   useEffect(() => {
-    if (!isOpen || isPaused || !currentStory) return;
+    if (!isOpen || isPaused || showViewers || showDeleteConfirm || !currentStory) return;
 
-    const interval = 50; // update every 50ms
+    const interval = 50;
     const totalDuration = 5000;
     const step = (interval / totalDuration) * 100;
 
@@ -85,11 +89,12 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isOpen, isPaused, currentIndex, stories.length, currentStory, onClose]);
+  }, [isOpen, isPaused, showViewers, showDeleteConfirm, currentIndex, stories.length, currentStory, onClose]);
 
   if (!isOpen || !currentStory) return null;
 
   const handleNext = () => {
+    setShowViewers(false);
     if (currentIndex < stories.length - 1) {
       setCurrentIndex((c) => c + 1);
       setProgress(0);
@@ -99,21 +104,26 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
   };
 
   const handlePrev = () => {
+    setShowViewers(false);
     if (currentIndex > 0) {
       setCurrentIndex((c) => c - 1);
       setProgress(0);
     }
   };
 
-  const handleDelete = async () => {
-    if (confirm('Delete this status update for everyone?')) {
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    try {
       await deleteStatusStory(currentStory.id);
       onStoryDeleted?.();
+      setShowDeleteConfirm(false);
       if (stories.length <= 1) {
         onClose();
       } else {
         handleNext();
       }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -123,7 +133,9 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
 
     try {
       await startDirectChat(currentStory.userId);
-      await sendTextMessage(`*Replying to status:*\n"${currentStory.text || currentStory.caption || 'Photo Status'}"\n\n${textToSend}`);
+      await sendTextMessage(
+        `*Replying to status:*\n"${currentStory.text || currentStory.caption || 'Photo Status'}"\n\n${textToSend}`
+      );
       setReplyText('');
       onClose();
     } catch (err) {
@@ -135,6 +147,8 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
     const date = new Date(isoDate);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  const viewerIds = (currentStory.viewedBy || []).filter((id) => id !== currentStory.userId);
 
   return (
     <div
@@ -178,7 +192,7 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
               <h4 className="text-xs font-bold text-white leading-tight">
                 {currentStory.userName}
               </h4>
-              <p className="text-[10px] text-white/70">
+              <p className="tabular-nums text-[10px] text-white/70">
                 {formatTimeAgo(currentStory.createdAt)}
               </p>
             </div>
@@ -187,23 +201,27 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
           <div className="flex items-center gap-2">
             {isOwnStory && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDelete();
+                  setShowDeleteConfirm(true);
                 }}
-                className="rounded-full bg-black/40 p-1.5 text-red-400 hover:bg-black/60 transition"
+                className="rounded-full bg-black/50 p-2 text-rose-400 hover:bg-black/75 transition"
                 title="Delete Status"
+                aria-label="Delete status"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
 
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="rounded-full bg-black/40 p-1.5 text-white/80 hover:bg-black/60 hover:text-white transition"
+              className="rounded-full bg-black/50 p-2 text-white/80 hover:bg-black/75 hover:text-white transition"
+              aria-label="Close status viewer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -241,53 +259,111 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
 
           {/* Navigation Click Zones */}
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               handlePrev();
             }}
-            className="absolute left-0 top-16 bottom-20 w-1/3 z-20 cursor-pointer opacity-0 hover:opacity-10 transition flex items-center justify-start pl-2"
+            className="absolute left-0 top-16 bottom-20 w-1/3 z-20 cursor-pointer opacity-0 hover:opacity-20 transition flex items-center justify-start pl-2"
+            aria-label="Previous story"
           >
             <ChevronLeft className="h-8 w-8 text-white drop-shadow-md" />
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               handleNext();
             }}
-            className="absolute right-0 top-16 bottom-20 w-2/3 z-20 cursor-pointer opacity-0 hover:opacity-10 transition flex items-center justify-end pr-2"
+            className="absolute right-0 top-16 bottom-20 w-2/3 z-20 cursor-pointer opacity-0 hover:opacity-20 transition flex items-center justify-end pr-2"
+            aria-label="Next story"
           >
             <ChevronRight className="h-8 w-8 text-white drop-shadow-md" />
           </button>
         </div>
 
-        {/* Bottom Section: Reply Bar (for other users) or Views Count (for own story) */}
+        {/* Story Viewers Drawer (for story owner) */}
+        {isOwnStory && showViewers && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-x-0 bottom-14 z-40 max-h-64 overflow-y-auto rounded-t-3xl border-t border-[#222d34] bg-[#111b21]/95 backdrop-blur-xl p-4 shadow-2xl animate-in slide-in-from-bottom"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="tabular-nums text-xs font-bold text-[#e9edef]">
+                Viewed by {viewerIds.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowViewers(false)}
+                className="rounded-lg p-1 text-[#8696a0] hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {viewerIds.length === 0 ? (
+              <p className="py-4 text-center text-xs text-[#8696a0]">No views yet</p>
+            ) : (
+              <div className="space-y-2">
+                {viewerIds.map((vid) => {
+                  const viewer = userCache[vid];
+                  return (
+                    <div key={vid} className="flex items-center gap-3 py-1">
+                      <Avatar
+                        src={viewer?.photoURL}
+                        name={viewer?.displayName || 'Contact'}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-[#e9edef] truncate">
+                          {viewer?.displayName || `User ${vid.slice(0, 6)}`}
+                        </p>
+                        {viewer?.username && (
+                          <p className="text-[10px] text-[#8696a0]">@{viewer.username}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bottom Section */}
         <div className="z-30 bg-gradient-to-t from-black/95 to-transparent p-3 pt-2">
           {isOwnStory ? (
-            <div className="flex items-center justify-center gap-2 py-1 text-white/90">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewers((v) => !v);
+              }}
+              className="flex w-full items-center justify-center gap-2 py-2 text-white/90 hover:text-[#25d366] transition"
+            >
               <Eye className="h-4 w-4 text-[#25d366]" />
-              <span className="text-xs font-semibold">
-                {Math.max(0, (currentStory.viewedBy?.length || 1) - 1)} views
+              <span className="tabular-nums text-xs font-semibold">
+                {viewerIds.length} {viewerIds.length === 1 ? 'view' : 'views'}
               </span>
-            </div>
+              <ChevronUp className={`h-3.5 w-3.5 transition-transform ${showViewers ? 'rotate-180' : ''}`} />
+            </button>
           ) : (
             <div className="space-y-2">
-              {/* Quick Emojis */}
               <div className="flex items-center justify-center gap-4">
                 {['❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'].map((emoji) => (
                   <button
                     key={emoji}
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSendReply(emoji);
                     }}
-                    className="text-lg hover:scale-130 transition"
+                    className="text-lg hover:scale-125 transition"
                   >
                     {emoji}
                   </button>
                 ))}
               </div>
 
-              {/* Reply Input */}
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -296,13 +372,18 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleSendReply();
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder="Reply to status..."
                   className="flex-1 rounded-full bg-white/20 px-4 py-2 text-xs text-white placeholder:text-white/60 focus:outline-none focus:ring-1 focus:ring-[#25d366]"
                 />
                 <button
-                  onClick={() => handleSendReply()}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendReply();
+                  }}
                   disabled={!replyText.trim()}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00a884] text-white disabled:opacity-40 transition"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#00a884] text-[#0b141a] disabled:opacity-40 transition"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>
@@ -311,6 +392,18 @@ export const StatusViewerModal: React.FC<StatusViewerModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Delete Status Confirmation */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        title="Delete status update?"
+        description="This update will be permanently removed for all of your contacts."
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -42,6 +42,9 @@
         "pinnedBy": { "type": "array" },
         "mutedBy": { "type": "array" },
         "archivedBy": { "type": "array" },
+        "deletedForUsers": { "type": "array" },
+        "clearedAt": { "type": "object" },
+        "disappearingDuration": { "type": "number" },
         "lastMessage": { "type": "object" },
         "unreadCounts": { "type": "object" }
       },
@@ -71,6 +74,7 @@
         "fileType": { "type": "string", "maxLength": 100 },
         "audioDuration": { "type": "number" },
         "reactions": { "type": "object" },
+        "starredBy": { "type": "array" },
         "readBy": { "type": "array" },
         "deliveredTo": { "type": "array" }
       },

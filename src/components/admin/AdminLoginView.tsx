@@ -10,7 +10,6 @@ import {
   ArrowRight,
   AlertCircle,
   ArrowLeft,
-  KeyRound,
 } from 'lucide-react';
 import { useToast } from '../common/Toast';
 import { auth } from '../../firebase/config';
@@ -73,7 +72,7 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#00a884] to-[#005c4b] shadow-xl shadow-[#00a884]/25 border border-[#00a884]/40">
-            <Shield className="h-8 w-8 text-white animate-pulse" />
+            <Shield className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-white">DEV CHAT Admin Portal</h1>
           <p className="text-xs text-[#8696a0]">

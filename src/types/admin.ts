@@ -145,6 +145,14 @@ export interface SystemSettings {
   updatedBy: string;
 }
 
+export interface DailyActivityPoint {
+  date: string;
+  label: string;
+  users: number;
+  messages: number;
+  calls: number;
+}
+
 export interface DashboardMetrics {
   totalUsers: number;
   activeUsersNow: number;
@@ -157,5 +165,6 @@ export interface DashboardMetrics {
   pendingReports: number;
   resolvedReports: number;
   storageUsedMb: number;
+  dailyActivity: DailyActivityPoint[];
   systemHealth: SystemHealthStatus;
 }
