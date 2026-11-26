@@ -21,8 +21,11 @@ import { useNotifications } from './NotificationContext';
 import { sound } from '../hooks/useSound';
 import {
   Conversation,
+  LocationData,
   Message,
   MessageType,
+  PollData,
+  SharedContactData,
   TypingStatus,
   UserProfile,
   UserStatusStory,
@@ -30,6 +33,8 @@ import {
 import {
   subscribeToStatusStories,
   markStoryAsViewed,
+  isStoryViewedBy,
+  STATUS_VIEWED_EVENT,
 } from '../services/statusService';
 import {
   clearChatForUser,
@@ -41,10 +46,14 @@ import {
   getOrCreateDirectConversation,
   markConversationAsRead,
   markMessagesAsDelivered,
+  markViewOnceMessageOpened,
+  pinMessageInConversation,
   sendMessage,
   setTypingStatus,
   toggleMessageReaction,
   toggleStarMessage,
+  unpinMessageInConversation,
+  votePollOption,
 } from '../services/chatService';
 import { uploadFileWithProgress } from '../services/storageService';
 import { subscribeToAllPresence } from '../services/presenceService';
@@ -76,20 +85,28 @@ interface ChatContextType {
     photoURL: string,
     participantIds: string[]
   ) => Promise<string>;
-  sendTextMessage: (text: string) => Promise<void>;
+  sendTextMessage: (text: string, conversationIdOverride?: string) => Promise<void>;
   sendFileMessage: (
     file: File | Blob,
     type: MessageType,
     fileName: string,
-    duration?: number
+    duration?: number,
+    options?: { viewOnce?: boolean; caption?: string }
   ) => Promise<void>;
+  sendPollMessage: (poll: PollData) => Promise<void>;
+  sendLocationMessage: (location: LocationData) => Promise<void>;
+  sendContactMessage: (contact: SharedContactData) => Promise<void>;
+  votePoll: (messageId: string, optionId: string) => Promise<void>;
+  pinMessage: (msg: Message) => Promise<void>;
+  unpinMessage: () => Promise<void>;
+  openViewOnceMedia: (messageId: string) => Promise<void>;
   editCurrentMessage: (messageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string, forEveryone: boolean) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
   clearConversation: (conversationId: string) => Promise<void>;
   starMessage: (messageId: string, shouldStar: boolean) => Promise<void>;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
-  emitTyping: (isTyping: boolean) => void;
+  emitTyping: (isTyping: boolean, activity?: 'typing' | 'recording') => void;
   getUserProfile: (uid: string) => Promise<UserProfile | null>;
 }
 
@@ -124,11 +141,28 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsub = subscribeToStatusStories((list) => {
       setStatusStories(list);
     });
-    return () => unsub();
+
+    const handleLocalView = (e: Event) => {
+      const detail = (e as CustomEvent<{ statusId: string; uid: string }>).detail;
+      if (!detail?.statusId || !detail?.uid) return;
+      setStatusStories((prev) =>
+        prev.map((story) =>
+          story.id === detail.statusId && !story.viewedBy?.includes(detail.uid)
+            ? { ...story, viewedBy: [...(story.viewedBy || []), detail.uid] }
+            : story
+        )
+      );
+    };
+
+    window.addEventListener(STATUS_VIEWED_EVENT, handleLocalView);
+    return () => {
+      unsub();
+      window.removeEventListener(STATUS_VIEWED_EVENT, handleLocalView);
+    };
   }, [user]);
 
   const hasUnreadStatuses = statusStories.some(
-    (s) => s.userId !== user?.uid && !s.viewedBy?.includes(user?.uid || '')
+    (s) => s.userId !== user?.uid && !isStoryViewedBy(s, user?.uid)
   );
 
   const viewStory = useCallback(
@@ -444,49 +478,55 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Send text message
-  const sendTextMessage = async (text: string) => {
-    if (!user || !activeConversationId || !text.trim()) return;
+  const sendTextMessage = async (text: string, conversationIdOverride?: string) => {
+    const targetConvId = conversationIdOverride || activeConversationId;
+    if (!user || !targetConvId || !text.trim()) return;
 
     sound.playSend();
-    const replyRef = replyingTo
-      ? {
-          messageId: replyingTo.id,
-          senderName: replyingTo.senderName,
-          text: replyingTo.text,
-          type: replyingTo.type,
-        }
-      : null;
+    const replyRef =
+      !conversationIdOverride && replyingTo
+        ? {
+            messageId: replyingTo.id,
+            senderName: replyingTo.senderName,
+            text: replyingTo.text,
+            type: replyingTo.type,
+          }
+        : null;
 
-    setReplyingTo(null);
-    emitTyping(false);
+    if (!conversationIdOverride) {
+      setReplyingTo(null);
+      emitTyping(false);
+    }
 
-    // Optimistic UI update
-    const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const now = new Date().toISOString();
-    const optimisticMsg: Message = {
-      id: tempId,
-      conversationId: activeConversationId,
-      senderId: user.uid,
-      senderName: profile?.displayName || user.displayName || 'User',
-      senderPhotoURL: profile?.photoURL || user.photoURL || '',
-      text: text.trim(),
-      type: 'text',
-      createdAt: now,
-      updatedAt: now,
-      isEdited: false,
-      isDeleted: false,
-      deletedFor: [],
-      replyTo: replyRef,
-      reactions: {},
-      readBy: [user.uid],
-      deliveredTo: [user.uid],
-    };
+    // Optimistic UI update when targeting active chat
+    if (targetConvId === activeConversationId) {
+      const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const now = new Date().toISOString();
+      const optimisticMsg: Message = {
+        id: tempId,
+        conversationId: targetConvId,
+        senderId: user.uid,
+        senderName: profile?.displayName || user.displayName || 'User',
+        senderPhotoURL: profile?.photoURL || user.photoURL || '',
+        text: text.trim(),
+        type: 'text',
+        createdAt: now,
+        updatedAt: now,
+        isEdited: false,
+        isDeleted: false,
+        deletedFor: [],
+        replyTo: replyRef,
+        reactions: {},
+        readBy: [user.uid],
+        deliveredTo: [user.uid],
+      };
 
-    setMessages((prev) => [...(prev || []), optimisticMsg]);
+      setMessages((prev) => [...(prev || []), optimisticMsg]);
+    }
 
     try {
       await sendMessage(
-        activeConversationId,
+        targetConvId,
         user.uid,
         profile?.displayName || user.displayName || 'User',
         profile?.photoURL || user.photoURL || '',
@@ -504,7 +544,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     file: File | Blob,
     type: MessageType,
     fileName: string,
-    duration?: number
+    duration?: number,
+    options?: { viewOnce?: boolean; caption?: string }
   ) => {
     if (!user || !activeConversationId) return;
 
@@ -531,6 +572,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setReplyingTo(null);
 
+      const messageText =
+        type === 'voice'
+          ? 'Voice Message'
+          : options?.caption !== undefined
+          ? options.caption
+          : fileName;
+
       // Optimistic media message
       const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const now = new Date().toISOString();
@@ -540,12 +588,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         senderId: user.uid,
         senderName: profile?.displayName || user.displayName || 'User',
         senderPhotoURL: profile?.photoURL || user.photoURL || '',
-        text: type === 'voice' ? 'Voice Message' : fileName,
+        text: messageText,
         type,
         createdAt: now,
         updatedAt: now,
         isEdited: false,
         isDeleted: false,
+        viewOnce: options?.viewOnce,
+        viewedBy: options?.viewOnce ? [] : undefined,
         deletedFor: [],
         replyTo: replyRef,
         fileUrl: res.url,
@@ -565,7 +615,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user.uid,
         profile?.displayName || user.displayName || 'User',
         profile?.photoURL || user.photoURL || '',
-        type === 'voice' ? 'Voice Message' : fileName,
+        messageText,
         type,
         {
           fileUrl: res.url,
@@ -573,6 +623,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           fileSize: res.size,
           fileType: res.type,
           audioDuration: duration,
+          viewOnce: options?.viewOnce,
           replyTo: replyRef,
         }
       );
@@ -581,6 +632,122 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setTimeout(() => setUploadProgress(null), 500);
     }
+  };
+
+  // Send interactive poll message
+  const sendPollMessage = async (poll: PollData) => {
+    if (!user || !activeConversationId || !poll.question.trim()) return;
+    sound.playSend();
+    const replyRef = replyingTo
+      ? {
+          messageId: replyingTo.id,
+          senderName: replyingTo.senderName,
+          text: replyingTo.text,
+          type: replyingTo.type,
+        }
+      : null;
+    setReplyingTo(null);
+
+    await sendMessage(
+      activeConversationId,
+      user.uid,
+      profile?.displayName || user.displayName || 'User',
+      profile?.photoURL || user.photoURL || '',
+      poll.question.trim(),
+      'poll',
+      { poll, replyTo: replyRef }
+    );
+  };
+
+  // Send location card message
+  const sendLocationMessage = async (location: LocationData) => {
+    if (!user || !activeConversationId) return;
+    sound.playSend();
+    const replyRef = replyingTo
+      ? {
+          messageId: replyingTo.id,
+          senderName: replyingTo.senderName,
+          text: replyingTo.text,
+          type: replyingTo.type,
+        }
+      : null;
+    setReplyingTo(null);
+
+    await sendMessage(
+      activeConversationId,
+      user.uid,
+      profile?.displayName || user.displayName || 'User',
+      profile?.photoURL || user.photoURL || '',
+      location.label || 'Shared Location',
+      'location',
+      { location, replyTo: replyRef }
+    );
+  };
+
+  // Send shared contact card
+  const sendContactMessage = async (contact: SharedContactData) => {
+    if (!user || !activeConversationId) return;
+    sound.playSend();
+    const replyRef = replyingTo
+      ? {
+          messageId: replyingTo.id,
+          senderName: replyingTo.senderName,
+          text: replyingTo.text,
+          type: replyingTo.type,
+        }
+      : null;
+    setReplyingTo(null);
+
+    await sendMessage(
+      activeConversationId,
+      user.uid,
+      profile?.displayName || user.displayName || 'User',
+      profile?.photoURL || user.photoURL || '',
+      contact.displayName,
+      'contact',
+      { contactCard: contact, replyTo: replyRef }
+    );
+  };
+
+  // Vote on poll option
+  const votePoll = async (messageId: string, optionId: string) => {
+    if (!user || !activeConversationId) return;
+    sound.playPop();
+    await votePollOption(activeConversationId, messageId, optionId, user.uid);
+  };
+
+  // Pin message in active conversation
+  const pinMessage = async (msg: Message) => {
+    if (!user || !activeConversationId) return;
+    let snippet = msg.text || '';
+    if (!snippet) {
+      if (msg.type === 'image') snippet = '📷 Photo';
+      else if (msg.type === 'voice') snippet = '🎤 Voice message';
+      else if (msg.type === 'file') snippet = `📎 ${msg.fileName || 'Document'}`;
+      else if (msg.type === 'poll') snippet = `📊 ${msg.poll?.question || 'Poll'}`;
+      else if (msg.type === 'location') snippet = '📍 Location';
+      else if (msg.type === 'contact') snippet = `👤 ${msg.contactCard?.displayName || 'Contact'}`;
+    }
+    await pinMessageInConversation(activeConversationId, {
+      messageId: msg.id,
+      text: snippet.slice(0, 140),
+      senderName: msg.senderName,
+      type: msg.type,
+      pinnedBy: user.uid,
+      pinnedAt: new Date().toISOString(),
+    });
+  };
+
+  // Unpin active message
+  const unpinMessage = async () => {
+    if (!activeConversationId) return;
+    await unpinMessageInConversation(activeConversationId);
+  };
+
+  // Mark view-once photo opened
+  const openViewOnceMedia = async (messageId: string) => {
+    if (!user || !activeConversationId) return;
+    await markViewOnceMessageOpened(activeConversationId, messageId, user.uid);
   };
 
   // Edit message
@@ -632,8 +799,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await toggleMessageReaction(activeConversationId, messageId, emoji, user.uid);
   };
 
-  // Emit typing indicator
-  const emitTyping = (isTyping: boolean) => {
+  // Emit typing or audio recording indicator
+  const emitTyping = (isTyping: boolean, activity: 'typing' | 'recording' = 'typing') => {
     if (!user || !activeConversationId) return;
 
     if (typingTimeoutRef.current) {
@@ -645,10 +812,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activeConversationId,
       user.uid,
       profile?.displayName || 'Someone',
-      isTyping
+      isTyping,
+      activity
     );
 
     if (isTyping) {
+      const expireMs = activity === 'recording' ? 6500 : 3500;
       typingTimeoutRef.current = setTimeout(() => {
         setTypingStatus(
           activeConversationId,
@@ -656,7 +825,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           profile?.displayName || 'Someone',
           false
         );
-      }, 3500);
+      }, expireMs);
     }
   };
 
@@ -686,6 +855,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createNewGroup,
         sendTextMessage,
         sendFileMessage,
+        sendPollMessage,
+        sendLocationMessage,
+        sendContactMessage,
+        votePoll,
+        pinMessage,
+        unpinMessage,
+        openViewOnceMedia,
         editCurrentMessage,
         deleteMessage,
         deleteConversation,

@@ -33,7 +33,16 @@ export interface LastMessageInfo {
   senderId: string;
   senderName: string;
   timestamp: string;
-  type: 'text' | 'image' | 'file' | 'voice' | 'system';
+  type: 'text' | 'image' | 'file' | 'voice' | 'poll' | 'location' | 'contact' | 'system';
+}
+
+export interface PinnedMessageInfo {
+  messageId: string;
+  text: string;
+  senderName: string;
+  type: MessageType;
+  pinnedBy: string;
+  pinnedAt: string;
 }
 
 export interface Conversation {
@@ -53,17 +62,53 @@ export interface Conversation {
   deletedForUsers?: string[];
   clearedAt?: Record<string, string>;
   disappearingDuration?: number; // seconds, 0 = off
+  pinnedMessage?: PinnedMessageInfo | null;
   lastMessage?: LastMessageInfo;
   unreadCounts?: Record<string, number>;
 }
 
-export type MessageType = 'text' | 'image' | 'file' | 'voice' | 'system';
+export type MessageType =
+  | 'text'
+  | 'image'
+  | 'file'
+  | 'voice'
+  | 'poll'
+  | 'location'
+  | 'contact'
+  | 'system';
 
 export interface ReplyReference {
   messageId: string;
   senderName: string;
   text: string;
   type: MessageType;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: string[]; // user UIDs
+}
+
+export interface PollData {
+  question: string;
+  options: PollOption[];
+  allowMultiple: boolean;
+}
+
+export interface LocationData {
+  latitude: number;
+  longitude: number;
+  label?: string;
+  address?: string;
+}
+
+export interface SharedContactData {
+  uid: string;
+  displayName: string;
+  username: string;
+  photoURL?: string;
+  phoneNumber?: string;
 }
 
 export interface Message {
@@ -78,6 +123,9 @@ export interface Message {
   updatedAt?: string;
   isEdited?: boolean;
   isDeleted?: boolean;
+  isForwarded?: boolean;
+  viewOnce?: boolean;
+  viewedBy?: string[];
   deletedFor?: string[];
   replyTo?: ReplyReference | null;
   fileUrl?: string;
@@ -85,6 +133,9 @@ export interface Message {
   fileSize?: number;
   fileType?: string;
   audioDuration?: number;
+  poll?: PollData;
+  location?: LocationData;
+  contactCard?: SharedContactData;
   reactions?: Record<string, string[]>; // emoji: [uid1, uid2...]
   starredBy?: string[];
   readBy?: string[];
@@ -95,6 +146,7 @@ export interface TypingStatus {
   userId: string;
   displayName: string;
   timestamp: number;
+  activity?: 'typing' | 'recording';
 }
 
 export interface UserStatusStory {

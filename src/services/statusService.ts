@@ -18,6 +18,39 @@ import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { UserStatusStory } from '../types';
 import { sanitizeForFirestore } from './chatService';
 
+const VIEWED_LOCAL_KEY = 'devchat_viewed_local_statuses';
+export const STATUS_VIEWED_EVENT = 'devchat-status-viewed';
+
+function getLocallyViewedIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(VIEWED_LOCAL_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addLocallyViewedId(statusId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getLocallyViewedIds();
+    if (!current.includes(statusId)) {
+      localStorage.setItem(VIEWED_LOCAL_KEY, JSON.stringify([...current.slice(-40), statusId]));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function isStoryViewedBy(story: UserStatusStory, uid?: string): boolean {
+  if (!uid) return false;
+  if (story.userId === uid) return true;
+  if (story.viewedBy?.includes(uid)) return true;
+  if (story.id.startsWith('demo_') && getLocallyViewedIds().includes(story.id)) return true;
+  return false;
+}
+
 export async function createStatusStory(
   userId: string,
   userName: string,
@@ -44,7 +77,7 @@ export async function createStatusStory(
     text: data.text || '',
     caption: data.caption || '',
     mediaUrl: data.mediaUrl || '',
-    backgroundColor: data.backgroundColor || '#075e54',
+    backgroundColor: data.backgroundColor || 'linear-gradient(135deg, #075e54 0%, #00a884 100%)',
     fontFamily: data.fontFamily || 'sans-serif',
     createdAt: now.toISOString(),
     expiresAt: expires.toISOString(),
@@ -57,20 +90,20 @@ export async function createStatusStory(
     return statusId;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `statuses/${statusId}`);
-    return statusId;
+    throw err;
   }
 }
 
 export const DEMO_STATUS_STORY: UserStatusStory = {
   id: 'demo_status_devchat_official',
   userId: 'devchat_team',
-  userName: 'DEV CHAT Official 🚀',
+  userName: 'DEV CHAT Updates',
   userPhotoURL: '/logo.png',
   type: 'text',
-  text: '✨ Welcome to DEV CHAT! Try our realistic 3D Emojis 🔥, Voice Notes 🎙️, and Status Updates! 💬',
-  backgroundColor: '#075e54',
+  text: 'Welcome to DEV CHAT Updates! Share 24-hour photo & text stories with 3D emojis 🚀✨',
+  backgroundColor: 'linear-gradient(135deg, #075e54 0%, #00a884 100%)',
   fontFamily: 'sans-serif',
-  createdAt: new Date().toISOString(),
+  createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
   expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   viewedBy: [],
 };
@@ -98,7 +131,7 @@ export function subscribeToStatusStories(
         }
       });
 
-      // Always supply demo status if list is empty
+      // Supply welcome story only if no stories exist yet
       if (all.length === 0) {
         all.push(DEMO_STATUS_STORY);
       }
@@ -116,13 +149,25 @@ export function subscribeToStatusStories(
 
 export async function markStoryAsViewed(statusId: string, currentUid: string): Promise<void> {
   if (!statusId || !currentUid) return;
+
+  if (statusId.startsWith('demo_')) {
+    addLocallyViewedId(statusId);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(STATUS_VIEWED_EVENT, { detail: { statusId, uid: currentUid } }));
+    }
+    return;
+  }
+
   try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(STATUS_VIEWED_EVENT, { detail: { statusId, uid: currentUid } }));
+    }
     const statusRef = doc(db, 'statuses', statusId);
     await updateDoc(statusRef, {
       viewedBy: arrayUnion(currentUid),
     });
-  } catch (err) {
-    // Non-critical
+  } catch {
+    // Non-critical if doc already expired/deleted
   }
 }
 
@@ -132,5 +177,6 @@ export async function deleteStatusStory(statusId: string): Promise<void> {
     await deleteDoc(doc(db, 'statuses', statusId));
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `statuses/${statusId}`);
+    throw err;
   }
 }

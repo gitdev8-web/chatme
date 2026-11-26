@@ -22,10 +22,14 @@ import { db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
 import {
   Conversation,
+  LocationData,
   Message,
   MessageType,
-  ReplyReference,
   ModerationReport,
+  PinnedMessageInfo,
+  PollData,
+  ReplyReference,
+  SharedContactData,
 } from '../types';
 
 /**
@@ -174,6 +178,11 @@ export async function sendMessage(
     fileSize?: number;
     fileType?: string;
     audioDuration?: number;
+    isForwarded?: boolean;
+    viewOnce?: boolean;
+    poll?: PollData;
+    location?: LocationData;
+    contactCard?: SharedContactData;
   }
 ): Promise<string> {
   const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -192,6 +201,7 @@ export async function sendMessage(
     updatedAt: now,
     isEdited: false,
     isDeleted: false,
+    isForwarded: Boolean(options?.isForwarded),
     deletedFor: [],
     replyTo: options?.replyTo || null,
     reactions: {},
@@ -204,6 +214,13 @@ export async function sendMessage(
   if (options?.fileSize !== undefined) rawMessage.fileSize = options.fileSize;
   if (options?.fileType) rawMessage.fileType = options.fileType;
   if (options?.audioDuration !== undefined) rawMessage.audioDuration = options.audioDuration;
+  if (options?.viewOnce) {
+    rawMessage.viewOnce = true;
+    rawMessage.viewedBy = [];
+  }
+  if (options?.poll) rawMessage.poll = options.poll;
+  if (options?.location) rawMessage.location = options.location;
+  if (options?.contactCard) rawMessage.contactCard = options.contactCard;
 
   const cleanMessage = sanitizeForFirestore(rawMessage);
 
@@ -213,9 +230,12 @@ export async function sendMessage(
     // Update conversation lastMessage & unread count for other participants
     const convRef = doc(db, 'conversations', conversationId);
     let previewText = text || '';
-    if (type === 'image') previewText = '📷 Photo';
+    if (type === 'image') previewText = options?.viewOnce ? '📷 View once photo' : '📷 Photo';
     else if (type === 'voice') previewText = '🎤 Voice message';
     else if (type === 'file') previewText = `📎 ${options?.fileName || 'File'}`;
+    else if (type === 'poll') previewText = `📊 Poll: ${options?.poll?.question || text}`;
+    else if (type === 'location') previewText = `📍 ${options?.location?.label || 'Location'}`;
+    else if (type === 'contact') previewText = `👤 Contact: ${options?.contactCard?.displayName || text}`;
 
     try {
       const convSnap = await getDoc(convRef);
@@ -429,7 +449,8 @@ export async function setTypingStatus(
   conversationId: string,
   userId: string,
   displayName: string,
-  isTyping: boolean
+  isTyping: boolean,
+  activity: 'typing' | 'recording' = 'typing'
 ): Promise<void> {
   const typingRef = doc(db, 'conversations', conversationId, 'typing', userId);
   try {
@@ -440,6 +461,7 @@ export async function setTypingStatus(
           userId,
           displayName,
           timestamp: Date.now(),
+          activity,
         },
         { merge: true }
       );
@@ -656,3 +678,103 @@ export async function updateDisappearingMessages(
   }
 }
 
+export async function votePollOption(
+  conversationId: string,
+  messageId: string,
+  optionId: string,
+  uid: string
+): Promise<void> {
+  const msgRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+  try {
+    const snap = await getDoc(msgRef);
+    if (!snap.exists()) return;
+    const msg = snap.data() as Message;
+    if (!msg.poll) return;
+
+    const updatedOptions = msg.poll.options.map((opt) => {
+      const hasVoted = (opt.votes || []).includes(uid);
+      if (opt.id === optionId) {
+        return {
+          ...opt,
+          votes: hasVoted
+            ? opt.votes.filter((id) => id !== uid)
+            : [...(opt.votes || []), uid],
+        };
+      }
+      if (!msg.poll!.allowMultiple) {
+        return {
+          ...opt,
+          votes: (opt.votes || []).filter((id) => id !== uid),
+        };
+      }
+      return opt;
+    });
+
+    await setDoc(
+      msgRef,
+      {
+        poll: {
+          ...msg.poll,
+          options: updatedOptions,
+        },
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    handleFirestoreError(
+      err,
+      OperationType.UPDATE,
+      `conversations/${conversationId}/messages/${messageId}`
+    );
+  }
+}
+
+export async function markViewOnceMessageOpened(
+  conversationId: string,
+  messageId: string,
+  uid: string
+): Promise<void> {
+  const msgRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+  try {
+    await updateDoc(msgRef, {
+      viewedBy: arrayUnion(uid),
+    });
+  } catch (err) {
+    handleFirestoreError(
+      err,
+      OperationType.UPDATE,
+      `conversations/${conversationId}/messages/${messageId}`
+    );
+  }
+}
+
+export async function pinMessageInConversation(
+  conversationId: string,
+  pinned: PinnedMessageInfo
+): Promise<void> {
+  const convRef = doc(db, 'conversations', conversationId);
+  try {
+    await setDoc(
+      convRef,
+      {
+        pinnedMessage: sanitizeForFirestore(pinned),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `conversations/${conversationId}`);
+  }
+}
+
+export async function unpinMessageInConversation(
+  conversationId: string
+): Promise<void> {
+  const convRef = doc(db, 'conversations', conversationId);
+  try {
+    await updateDoc(convRef, {
+      pinnedMessage: null,
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `conversations/${conversationId}`);
+  }
+}

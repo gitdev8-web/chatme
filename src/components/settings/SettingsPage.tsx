@@ -25,6 +25,7 @@ import { useToast } from '../common/Toast';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { Avatar } from '../common/Avatar';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { WallpaperModal } from '../chat/WallpaperModal';
 
 interface SettingsPageProps {
   onBackMobile?: () => void;
@@ -44,6 +45,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('account');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showWallpaperModal, setShowWallpaperModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [soundsEnabled, setSoundsEnabled] = useState<boolean>(
@@ -108,13 +110,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="flex h-full w-full flex-col bg-[#0b141a] text-[#e9edef] select-none overflow-hidden">
       {/* Top Header */}
-      <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-3 shadow-sm flex-shrink-0">
+      <div className="flex h-14 md:h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-3">
           {onBackMobile && (
             <button
               type="button"
               onClick={onBackMobile}
-              className="md:hidden flex h-10 w-10 items-center justify-center rounded-full text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+              className="md:hidden flex h-11 w-11 items-center justify-center rounded-full text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
               title="Back"
               aria-label="Back to chats"
             >
@@ -413,6 +415,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
                   />
                 </label>
+
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-[#e9edef]">Chat Wallpaper</h4>
+                    <p className="text-[11px] text-[#8696a0] mt-0.5">
+                      Customize the background style behind your chat bubbles
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowWallpaperModal(true)}
+                    className="min-h-[40px] rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-sm whitespace-nowrap"
+                  >
+                    Choose Wallpaper
+                  </button>
+                </div>
               </div>
             )}
 
@@ -520,6 +538,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         description="This action cannot be undone. Your profile, preferences, and session access will be removed."
         confirmText="Delete account"
         variant="danger"
+      />
+
+      {/* Chat Wallpaper Picker */}
+      <WallpaperModal
+        isOpen={showWallpaperModal}
+        onClose={() => setShowWallpaperModal(false)}
       />
     </div>
   );

@@ -103,22 +103,22 @@ export const CommunitiesPage: React.FC<CommunitiesPageProps> = ({
   return (
     <div className="flex h-full w-full flex-col bg-[#0b141a] text-[#e9edef] select-none overflow-hidden">
       {/* Top Header */}
-      <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-3 shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex h-14 md:h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3.5 sm:px-4 py-2 shadow-sm flex-shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           {onBackMobile && (
             <button
               type="button"
               onClick={onBackMobile}
-              className="md:hidden flex h-10 w-10 items-center justify-center rounded-full text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+              className="md:hidden flex h-11 w-11 items-center justify-center rounded-full text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
               title="Back"
               aria-label="Back to chats"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-[#00a884]" />
-            <h1 className="text-lg font-semibold text-[#e9edef]">Communities</h1>
+            <h1 className="text-base sm:text-lg font-semibold text-[#e9edef]">Communities</h1>
           </div>
         </div>
 
@@ -131,10 +131,11 @@ export const CommunitiesPage: React.FC<CommunitiesPageProps> = ({
               setIsCreateModalOpen(true);
             }
           }}
-          className="flex items-center gap-1.5 rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-md"
+          className="flex min-h-[40px] items-center gap-1.5 rounded-xl bg-[#00a884] px-3.5 sm:px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-md"
         >
           <Plus className="h-4 w-4 stroke-[2.5]" />
-          <span>New Community</span>
+          <span className="hidden sm:inline">New Community</span>
+          <span className="sm:hidden">New</span>
         </button>
       </div>
 
@@ -148,7 +149,7 @@ export const CommunitiesPage: React.FC<CommunitiesPageProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search communities and groups..."
-            className="w-full rounded-xl bg-[#202c33] border border-[#222d34] pl-10 pr-9 py-2.5 text-xs text-[#e9edef] placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition shadow-sm"
+            className="w-full rounded-xl bg-[#202c33] border border-[#222d34] pl-10 pr-9 py-2.5 text-[15px] md:text-xs text-[#e9edef] placeholder-[#8696a0] focus:border-[#00a884] focus:outline-none transition shadow-sm"
           />
           {searchTerm && (
             <button

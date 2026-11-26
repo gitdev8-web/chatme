@@ -28,7 +28,6 @@ import { IncomingCallModal } from './components/calls/IncomingCallModal';
 import { CallModal } from './components/calls/CallModal';
 import { PWAUpdateToast } from './components/common/PWAUpdateToast';
 import { subscribeToIncomingCalls } from './services/callService';
-import { subscribeToStatusStories } from './services/statusService';
 import { CallSession } from './types';
 import { SystemAnnouncement, SystemSettings } from './types/admin';
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
@@ -65,6 +64,7 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
     showChatDetails,
     setShowChatDetails,
     setActiveFilter,
+    hasUnreadStatuses,
   } = useChat();
 
   const [isContactsOpen, setIsContactsOpen] = useState(false);
@@ -72,10 +72,9 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<BottomNavTab>('chats');
 
-  // Real-time call & status states
+  // Real-time call states
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
   const [activeCallSession, setActiveCallSession] = useState<CallSession | null>(null);
-  const [hasUnreadStatus, setHasUnreadStatus] = useState(false);
 
   // Active platform announcements
   const [announcements, setAnnouncements] = useState<SystemAnnouncement[]>([]);
@@ -88,17 +87,6 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
     }
     const unsub = subscribeToIncomingCalls(user.uid, (call) => {
       setIncomingCall(call);
-    });
-    return () => unsub();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = subscribeToStatusStories((stories) => {
-      const hasUnread = stories.some(
-        (s) => s.userId !== user.uid && !s.viewedBy?.includes(user.uid)
-      );
-      setHasUnreadStatus(hasUnread);
     });
     return () => unsub();
   }, [user]);
@@ -320,7 +308,7 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
           activeTab={activeBottomTab}
           onTabChange={handleBottomTabChange}
           unreadCount={totalUnread}
-          hasUnreadStatus={hasUnreadStatus}
+          hasUnreadStatus={hasUnreadStatuses}
         />
       )}
 
@@ -456,8 +444,8 @@ const AppContent: React.FC = () => {
             alt="DEV CHAT"
             className="h-16 w-16 rounded-2xl shadow-xl shadow-[#00a884]/25 object-cover border border-[#00a884]/30 mb-6"
           />
-          <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
-            <div className="h-full bg-[#00a884] rounded-full animate-pulse w-3/5" />
+          <div className="relative w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
+            <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-[#00a884] to-[#25d366] rounded-full animate-shimmer" />
           </div>
           <h2 className="text-base font-semibold tracking-tight text-white">
             DEV CHAT Web
@@ -496,8 +484,8 @@ const AppContent: React.FC = () => {
             alt="DEV CHAT"
             className="h-16 w-16 rounded-2xl shadow-xl shadow-[#00a884]/25 object-cover border border-[#00a884]/30 mb-6"
           />
-          <div className="w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
-            <div className="h-full bg-[#00a884] rounded-full animate-pulse w-4/5" />
+          <div className="relative w-56 h-1 bg-[#202c33] rounded-full overflow-hidden mb-4">
+            <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-[#00a884] to-[#25d366] rounded-full animate-shimmer" />
           </div>
           <h2 className="text-base font-semibold tracking-tight text-white">
             DEV CHAT Web

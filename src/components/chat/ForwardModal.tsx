@@ -52,36 +52,50 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
     if (!user) return;
     setSendingToId(targetConv.id);
     try {
-      let forwardText = message.text;
-      if (message.type === 'text') {
-        forwardText = `${message.text}`;
-      }
-
       await sendMessage(
         targetConv.id,
         user.uid,
         profile?.displayName || 'User',
         profile?.photoURL,
-        forwardText,
+        message.text,
         message.type,
         {
+          isForwarded: true,
           fileUrl: message.fileUrl,
           fileName: message.fileName,
           fileSize: message.fileSize,
           fileType: message.fileType,
           audioDuration: message.audioDuration,
+          poll: message.poll,
+          location: message.location,
+          contactCard: message.contactCard,
         }
       );
 
       showToast('Message forwarded!', 'success');
       setActiveConversationId(targetConv.id);
       onClose();
-    } catch (err) {
+    } catch {
       showToast('Failed to forward message', 'error');
     } finally {
       setSendingToId(null);
     }
   };
+
+  const previewLabel =
+    message.type === 'text'
+      ? message.text
+      : message.type === 'image'
+      ? '📷 Photo'
+      : message.type === 'voice'
+      ? '🎤 Voice Message'
+      : message.type === 'poll'
+      ? `📊 ${message.poll?.question || 'Poll'}`
+      : message.type === 'location'
+      ? `📍 ${message.location?.label || 'Location'}`
+      : message.type === 'contact'
+      ? `👤 ${message.contactCard?.displayName || 'Contact'}`
+      : `📎 ${message.fileName || 'File'}`;
 
   return (
     <Modal
@@ -93,31 +107,25 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
     >
       <div className="space-y-3 select-none">
         {/* Message preview snippet */}
-        <div className="p-2.5 rounded-xl bg-[#111b21] border border-[#222d34] text-xs text-[#8696a0] truncate">
+        <div className="p-3 rounded-xl bg-[#202c33]/70 border border-[#222d34] text-xs text-[#8696a0] truncate">
           <span className="text-[#25d366] font-semibold mr-1">Forwarding:</span>
-          {message.type === 'text'
-            ? message.text
-            : message.type === 'image'
-            ? '📷 Photo'
-            : message.type === 'voice'
-            ? '🎤 Voice Message'
-            : `📎 ${message.fileName || 'File'}`}
+          {previewLabel}
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8696a0]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search conversations..."
-            className="w-full rounded-xl border border-[#222d34] bg-[#111b21] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none"
+            className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-9 py-2.5 text-[16px] sm:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#25d366] focus:outline-none"
           />
         </div>
 
         {/* List of conversations */}
-        <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+        <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
           {filteredConversations.length === 0 ? (
             <p className="text-center py-6 text-xs text-[#8696a0]">
               No conversations found.
@@ -136,7 +144,7 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
               return (
                 <div
                   key={conv.id}
-                  className="flex items-center justify-between p-2 rounded-xl bg-[#111b21]/70 hover:bg-[#202c33] transition"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-[#202c33]/60 hover:bg-[#202c33] transition"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Avatar
@@ -155,9 +163,10 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => handleForward(conv)}
                     disabled={sendingToId === conv.id}
-                    className="flex items-center gap-1 rounded-xl bg-[#00a884] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#009374] disabled:opacity-50 transition"
+                    className="min-h-[38px] flex items-center gap-1 rounded-xl bg-[#00a884] px-3.5 py-1.5 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] disabled:opacity-50 transition flex-shrink-0"
                   >
                     <Send className="h-3 w-3" />
                     <span>{sendingToId === conv.id ? 'Sending...' : 'Send'}</span>

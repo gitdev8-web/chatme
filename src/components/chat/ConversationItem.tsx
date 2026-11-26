@@ -15,6 +15,9 @@ import {
   Camera,
   Mic,
   FileText,
+  BarChart3,
+  MapPin,
+  UserCheck,
 } from 'lucide-react';
 import { Conversation, UserProfile, UserStatusStory } from '../../types';
 import { Avatar } from '../common/Avatar';
@@ -27,6 +30,8 @@ import { isUserOnline } from '../../utils/presenceUtils';
 import { useChat } from '../../context/ChatContext';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { useToast } from '../common/Toast';
+import { StatusRing } from '../status/StatusRing';
+import { isStoryViewedBy } from '../../services/statusService';
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -75,7 +80,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     ? userStatusStories.filter((s) => s.userId === partnerId)
     : [];
   const hasActiveStatus = partnerStories.length > 0;
-  const hasUnreadStatus = partnerStories.some((s) => !s.viewedBy?.includes(currentUserId));
+  const unviewedStatusCount = partnerStories.filter(
+    (s) => !isStoryViewedBy(s, currentUserId)
+  ).length;
 
   const title = isDirect
     ? partnerProfile?.displayName || 'DEV CHAT User'
@@ -150,8 +157,28 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         {lastMsg.type === 'file' && (
           <FileText className="h-3.5 w-3.5 text-[#8696a0] flex-shrink-0" />
         )}
+        {lastMsg.type === 'poll' && (
+          <BarChart3 className="h-3.5 w-3.5 text-[#ffd279] flex-shrink-0" />
+        )}
+        {lastMsg.type === 'location' && (
+          <MapPin className="h-3.5 w-3.5 text-[#25d366] flex-shrink-0" />
+        )}
+        {lastMsg.type === 'contact' && (
+          <UserCheck className="h-3.5 w-3.5 text-[#53bdeb] flex-shrink-0" />
+        )}
         <span className="truncate">
-          {lastMsg.text || (lastMsg.type === 'image' ? 'Photo' : lastMsg.type === 'voice' ? 'Voice message' : 'File')}
+          {lastMsg.text ||
+            (lastMsg.type === 'image'
+              ? 'Photo'
+              : lastMsg.type === 'voice'
+              ? 'Voice message'
+              : lastMsg.type === 'poll'
+              ? 'Poll'
+              : lastMsg.type === 'location'
+              ? 'Location'
+              : lastMsg.type === 'contact'
+              ? 'Contact'
+              : 'File')}
         </span>
       </div>
     );
@@ -168,29 +195,34 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             : 'hover:bg-[#202c33]'
         }`}
       >
-        {/* Avatar with optional status ring */}
-        <div
-          className="relative flex-shrink-0"
-          onClick={(e) => {
-            if (hasActiveStatus && onViewStatus) {
-              e.stopPropagation();
-              onViewStatus(partnerStories);
-            }
-          }}
-        >
-          <div
-            className={`p-0.5 rounded-full transition-transform ${
-              hasActiveStatus
-                ? hasUnreadStatus
-                  ? 'bg-gradient-to-tr from-[#25d366] to-[#00a884] ring-2 ring-[#25d366]/60 cursor-pointer hover:scale-105'
-                  : 'ring-1 ring-[#8696a0]/50 cursor-pointer hover:scale-105'
-                : ''
-            }`}
-            title={hasActiveStatus ? `${title}'s status story` : undefined}
+        {/* Avatar with optional segmented status ring */}
+        {hasActiveStatus ? (
+          <StatusRing
+            totalSegments={partnerStories.length}
+            unviewedCount={unviewedStatusCount}
+            sizePx={42}
+            strokeWidth={2}
+            onClick={(e) => {
+              if (onViewStatus) {
+                e.stopPropagation();
+                onViewStatus(partnerStories);
+              }
+            }}
+            title={`${title}'s status update`}
           >
+            <Avatar
+              src={avatarSrc}
+              name={title}
+              size="md"
+              isOnline={isOnline}
+              showPresence={false}
+            />
+          </StatusRing>
+        ) : (
+          <div className="relative flex-shrink-0">
             {!isDirect && !avatarSrc ? (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#6a7f8a]/30 text-[#e9edef]">
-                <Users className="h-6 w-6" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6a7f8a]/30 text-[#e9edef]">
+                <Users className="h-5 w-5" />
               </div>
             ) : (
               <Avatar
@@ -198,11 +230,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                 name={title}
                 size="md"
                 isOnline={isOnline}
-                showPresence={isDirect && !hasActiveStatus}
+                showPresence={isDirect}
               />
             )}
           </div>
-        </div>
+        )}
 
         {/* Main Content */}
         <div className="flex-1 min-w-0">

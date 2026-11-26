@@ -16,6 +16,8 @@ import {
   X,
   Clock,
   Flag,
+  Pin,
+  Palette,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -28,12 +30,22 @@ import { Modal } from '../common/Modal';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { MessagesSkeleton } from '../common/LoadingSkeleton';
 import { ForwardModal } from './ForwardModal';
+import { MessageInfoModal } from './MessageInfoModal';
+import { WallpaperModal } from './WallpaperModal';
 import { CallModal } from '../calls/CallModal';
 import { StatusViewerModal } from '../status/StatusViewerModal';
+import { StatusRing } from '../status/StatusRing';
+import { isStoryViewedBy } from '../../services/statusService';
 import { initiateCall } from '../../services/callService';
 import { submitReport, toggleMuteConversation } from '../../services/chatService';
 import { useToast } from '../common/Toast';
 import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
+import {
+  ChatWallpaperId,
+  getSavedWallpaper,
+  getWallpaperClass,
+  subscribeToWallpaperChange,
+} from '../../utils/wallpaperUtils';
 
 interface ChatAreaProps {
   onBackMobile: () => void;
@@ -69,6 +81,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     clearConversation,
     starMessage,
     reactToMessage,
+    votePoll,
+    pinMessage,
+    unpinMessage,
+    openViewOnceMedia,
+    startDirectChat,
     setReplyingTo,
     setActiveConversationId,
   } = useChat();
@@ -80,6 +97,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [editText, setEditText] = useState('');
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [infoMessage, setInfoMessage] = useState<Message | null>(null);
+  const [isWallpaperModalOpen, setIsWallpaperModalOpen] = useState(false);
+  const [wallpaperId, setWallpaperId] = useState<ChatWallpaperId>(() => getSavedWallpaper());
   const [reportingMessage, setReportingMessage] = useState<Message | null>(null);
   const [reportReason, setReportReason] = useState('Spam or abuse');
   const [reportDetails, setReportDetails] = useState('');
@@ -127,7 +147,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     ? statusStories.filter((s) => s.userId === partnerId)
     : [];
   const hasPartnerStatus = partnerStories.length > 0;
+  const unviewedPartnerStatusCount = partnerStories.filter(
+    (s) => !isStoryViewedBy(s, user?.uid)
+  ).length;
   const [isHeaderStatusViewerOpen, setIsHeaderStatusViewerOpen] = useState(false);
+
+  const scrollToAndHighlightMessage = (messageId: string) => {
+    const el = document.getElementById(`msg_${messageId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('animate-target-flash', 'rounded-xl');
+    setTimeout(() => {
+      el.classList.remove('animate-target-flash', 'rounded-xl');
+    }, 1300);
+  };
 
   // Search matching message IDs (newest-to-oldest order feels natural, or oldest-to-newest)
   const matchingMessageIds = useMemo(() => {
@@ -179,6 +212,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       scrollToBottom(true);
     }
   }, [(messages || []).length]);
+
+  useEffect(() => {
+    const unsub = subscribeToWallpaperChange((nextId) => setWallpaperId(nextId));
+    return () => unsub();
+  }, []);
 
   // Close header menu on click outside & handle Escape
   useEffect(() => {
@@ -306,7 +344,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const typingText = () => {
     if (!typingUsers || typingUsers.length === 0) return null;
     if (typingUsers.length === 1) {
-      return `${typingUsers[0]?.displayName || 'Someone'} is typing...`;
+      const first = typingUsers[0];
+      if (first?.activity === 'recording') {
+        return isDirect ? 'recording audio...' : `${first?.displayName || 'Someone'} is recording audio...`;
+      }
+      return isDirect ? 'typing...' : `${first?.displayName || 'Someone'} is typing...`;
     }
     if (typingUsers.length === 2) {
       return `${typingUsers[0]?.displayName || 'User'} and ${typingUsers[1]?.displayName || 'User'} are typing...`;
@@ -344,25 +386,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Welcome Splash Screen (desktop only when no conversation is selected)
   if (!activeConversation) {
     return (
-      <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#222e35] p-8 select-none text-center relative border-b-4 border-[#00a884]">
-        <div className="flex flex-col items-center max-w-md my-auto">
+      <div className="flex h-full flex-1 flex-col items-center justify-center bg-[#182229] p-8 select-none text-center relative border-b-4 border-[#00a884] overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 42%, rgba(0, 168, 132, 0.12) 0%, transparent 58%)',
+          }}
+        />
+        <div className="relative z-10 flex flex-col items-center max-w-md my-auto">
           <div className="relative mb-7 flex items-center justify-center">
             <img
               src="/logo.png"
               alt="DEV CHAT"
-              className="h-28 w-28 rounded-3xl shadow-2xl shadow-[#00a884]/20 border border-[#00a884]/30 object-cover"
+              className="h-28 w-28 rounded-3xl shadow-2xl shadow-[#00a884]/25 border border-[#00a884]/35 object-cover"
             />
           </div>
 
-          <h2 className="text-2xl font-semibold text-[#e9edef] tracking-tight">
+          <h2 className="text-2xl font-bold text-[#e9edef] tracking-tight text-balance">
             DEV CHAT Web
           </h2>
-          <p className="mt-3 text-sm text-[#8696a0] leading-relaxed">
-            Send and receive messages, make real-time audio and video calls, and share status stories across all your devices.
+          <p className="mt-3 text-sm text-[#8696a0] leading-relaxed text-balance">
+            Send and receive messages, make real-time audio and video calls, and share status updates across all your devices.
           </p>
         </div>
 
-        <div className="mt-auto pb-4 flex items-center gap-1.5 text-xs text-[#8696a0]">
+        <div className="relative z-10 mt-auto pb-4 flex items-center gap-1.5 text-xs text-[#8696a0]">
           <Lock className="h-3.5 w-3.5 text-[#00a884]" />
           <span>Your personal messages and calls are end-to-end encrypted</span>
         </div>
@@ -376,41 +425,47 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
       {/* Top Header */}
-      <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3 sm:px-4 py-2 z-10 shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex h-14 md:h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-2.5 sm:px-4 py-2 z-10 shadow-sm flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
             onClick={onBackMobile}
-            className="md:hidden flex h-10 w-10 items-center justify-center rounded-full -ml-1 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition active:scale-95 flex-shrink-0"
+            className="md:hidden flex h-11 w-11 items-center justify-center rounded-full -ml-1 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition active:scale-95 flex-shrink-0"
             title="Back to chats"
             aria-label="Back to chats"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
 
-          <div
-            className={`p-0.5 rounded-full transition-transform ${
-              hasPartnerStatus
-                ? 'bg-gradient-to-tr from-[#25d366] to-[#00a884] ring-2 ring-[#25d366]/60 cursor-pointer hover:scale-105'
-                : ''
-            }`}
-            onClick={() => {
-              if (hasPartnerStatus) {
-                setIsHeaderStatusViewerOpen(true);
-              } else {
-                onToggleDetails();
-              }
-            }}
-            title={hasPartnerStatus ? `View ${title}'s status story` : undefined}
-          >
-            <Avatar
-              src={avatarSrc}
-              name={title}
-              size="md"
-              isOnline={isPartnerOnline}
-              showPresence={isDirect}
-              className="cursor-pointer"
-            />
-          </div>
+          {hasPartnerStatus ? (
+            <StatusRing
+              totalSegments={partnerStories.length}
+              unviewedCount={unviewedPartnerStatusCount}
+              sizePx={40}
+              strokeWidth={2}
+              onClick={() => setIsHeaderStatusViewerOpen(true)}
+              title={`View ${title}'s status update`}
+            >
+              <Avatar
+                src={avatarSrc}
+                name={title}
+                size="md"
+                isOnline={isPartnerOnline}
+                showPresence={false}
+                className="cursor-pointer"
+              />
+            </StatusRing>
+          ) : (
+            <div onClick={onToggleDetails} className="cursor-pointer">
+              <Avatar
+                src={avatarSrc}
+                name={title}
+                size="md"
+                isOnline={isPartnerOnline}
+                showPresence={isDirect}
+                className="cursor-pointer"
+              />
+            </div>
+          )}
 
           <div className="min-w-0 cursor-pointer" onClick={onToggleDetails}>
             <div className="flex items-center gap-1.5">
@@ -529,6 +584,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   Search messages
                 </button>
                 <button
+                  onClick={() => {
+                    setShowChatMenu(false);
+                    setIsWallpaperModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  <Palette className="h-3.5 w-3.5 text-[#00a884]" />
+                  <span>Chat wallpaper</span>
+                </button>
+                <button
                   onClick={handleToggleMute}
                   className="flex w-full items-center px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
                 >
@@ -559,16 +624,53 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
+      {/* Pinned Message Banner (WhatsApp In-Chat Pin) */}
+      {activeConversation.pinnedMessage && (
+        <div
+          onClick={() =>
+            scrollToAndHighlightMessage(activeConversation.pinnedMessage!.messageId)
+          }
+          className="flex items-center justify-between gap-2.5 border-b border-[#222d34] bg-[#182229]/95 px-3 sm:px-4 py-2 cursor-pointer hover:bg-[#202c33] transition z-10 flex-shrink-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#00a884]/15 text-[#25d366]">
+              <Pin className="h-3.5 w-3.5 rotate-45" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold text-[#25d366] truncate">
+                Pinned by {activeConversation.pinnedMessage.senderName}
+              </p>
+              <p className="text-xs text-[#e9edef] truncate">
+                {activeConversation.pinnedMessage.text}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              unpinMessage();
+              showToast('Message unpinned', 'info');
+            }}
+            aria-label="Unpin message"
+            title="Unpin message"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Inline Search Bar with Match Counter & Prev/Next Navigation */}
       {searchInChat && (
-        <div className="flex items-center gap-2 border-b border-[#222d34] bg-[#202c33] px-4 py-2 text-xs animate-in fade-in">
+        <div className="flex items-center gap-2 border-b border-[#222d34] bg-[#202c33] px-3 sm:px-4 py-2 text-xs animate-in fade-in">
           <Search className="h-4 w-4 text-[#8696a0] flex-shrink-0" />
           <input
             type="text"
             value={chatSearchTerm}
             onChange={(e) => setChatSearchTerm(e.target.value)}
             placeholder="Search messages in this chat..."
-            className="flex-1 bg-transparent text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none min-w-0"
+            className="flex-1 bg-transparent text-[15px] sm:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none min-w-0"
             autoFocus
           />
           {chatSearchTerm.trim() && (
@@ -583,7 +685,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 disabled={matchingMessageIds.length === 0}
                 onClick={() => jumpToMatch('prev')}
                 aria-label="Previous match"
-                className="rounded p-1 text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef] disabled:opacity-40"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef] disabled:opacity-40"
               >
                 <ChevronUp className="h-4 w-4" />
               </button>
@@ -592,7 +694,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 disabled={matchingMessageIds.length === 0}
                 onClick={() => jumpToMatch('next')}
                 aria-label="Next match"
-                className="rounded p-1 text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef] disabled:opacity-40"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef] disabled:opacity-40"
               >
                 <ChevronDown className="h-4 w-4" />
               </button>
@@ -605,7 +707,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               setChatSearchTerm('');
             }}
             aria-label="Close search"
-            className="rounded p-1 text-[#8696a0] hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#8696a0] hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -616,7 +718,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 devchat-pattern-bg relative"
+        className={`flex-1 overflow-y-auto px-2.5 sm:px-4 py-4 relative ${getWallpaperClass(wallpaperId)}`}
       >
         <div className="flex justify-center my-3">
           <div className="max-w-md rounded-xl bg-[#182229] px-4 py-2 text-center text-[11px] text-[#ffd279] shadow-sm flex items-center justify-center gap-1.5 leading-relaxed border border-[#ffd279]/15">
@@ -658,6 +760,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   message={msg}
                   isSelf={msg.senderId === user?.uid}
                   isGroup={activeConversation.type === 'group'}
+                  isPinned={activeConversation.pinnedMessage?.messageId === msg.id}
                   currentUserId={user?.uid || ''}
                   userCache={userCache}
                   isSearchMatch={isMatch}
@@ -670,14 +773,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   onDelete={deleteMessage}
                   onReact={reactToMessage}
                   onStar={starMessage}
+                  onPin={async (m) => {
+                    await pinMessage(m);
+                    showToast('Message pinned to top of chat', 'success');
+                  }}
+                  onUnpin={async () => {
+                    await unpinMessage();
+                    showToast('Message unpinned', 'info');
+                  }}
+                  onInfo={(m) => setInfoMessage(m)}
+                  onVotePoll={votePoll}
+                  onOpenViewOnce={(m) => openViewOnceMedia(m.id)}
+                  onMessageContact={(uid) => startDirectChat(uid)}
                   onOpenMedia={(url, name) => {
                     setViewingMediaUrl(url);
                     setViewingMediaName(name);
                   }}
-                  onScrollToMessage={(mid) => {
-                    const el = document.getElementById(`msg_${mid}`);
-                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }}
+                  onScrollToMessage={scrollToAndHighlightMessage}
                   onForward={(m) => setForwardingMessage(m)}
                   onReport={(m) => setReportingMessage(m)}
                 />
@@ -685,6 +797,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             );
           })
         )}
+
+        {/* Animated WhatsApp Live Typing Bubble */}
+        {(typingUsers || []).length > 0 && (
+          <div className="flex items-center gap-2 my-2 px-1 sm:px-2 animate-msg-in">
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-tl-none bg-[#202c33] px-3.5 py-2.5 shadow-md bubble-incoming-tail relative">
+              {!isDirect && typingUsers[0]?.displayName && (
+                <span className="text-[11px] font-semibold text-[#53bdeb]">
+                  {typingUsers[0].displayName}
+                </span>
+              )}
+              {typingUsers[0]?.activity === 'recording' ? (
+                <span className="text-xs font-medium text-[#25d366]">
+                  Recording voice note...
+                </span>
+              ) : (
+                <div className="flex items-center gap-1 py-0.5" aria-label="Typing">
+                  <span className="h-2 w-2 rounded-full bg-[#8696a0] typing-dot" />
+                  <span className="h-2 w-2 rounded-full bg-[#8696a0] typing-dot" />
+                  <span className="h-2 w-2 rounded-full bg-[#8696a0] typing-dot" />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -693,7 +830,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <button
           type="button"
           onClick={() => scrollToBottom(true)}
-          className="absolute bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#202c33] text-[#e9edef] shadow-xl hover:bg-[#2a3942] border border-[#222d34] transition hover:scale-105"
+          className="absolute bottom-[4.75rem] right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-[#202c33] text-[#e9edef] shadow-xl hover:bg-[#2a3942] border border-[#222d34] transition hover:scale-105 active:scale-95"
           title="Scroll to bottom"
           aria-label="Scroll to latest messages"
         >
@@ -725,6 +862,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         isOpen={!!forwardingMessage}
         message={forwardingMessage}
         onClose={() => setForwardingMessage(null)}
+      />
+
+      <MessageInfoModal
+        isOpen={!!infoMessage}
+        message={infoMessage}
+        participantIds={activeConversation.participantIds || []}
+        currentUserId={user?.uid || ''}
+        userCache={userCache}
+        onClose={() => setInfoMessage(null)}
+      />
+
+      <WallpaperModal
+        isOpen={isWallpaperModalOpen}
+        onClose={() => setIsWallpaperModalOpen(false)}
       />
 
       <StatusViewerModal

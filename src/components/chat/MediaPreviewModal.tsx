@@ -4,14 +4,14 @@
  */
 
 import React, { useState } from 'react';
-import { X, Send, Smile, Crop, RotateCw, Loader2 } from 'lucide-react';
+import { X, Send, Loader2, Timer } from 'lucide-react';
 
 interface MediaPreviewModalProps {
   isOpen: boolean;
   file: File | null;
   previewUrl: string | null;
   onClose: () => void;
-  onSend: (file: File, caption: string) => Promise<void>;
+  onSend: (file: File, caption: string, viewOnce: boolean) => Promise<void>;
 }
 
 export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
@@ -22,6 +22,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
   onSend,
 }) => {
   const [caption, setCaption] = useState('');
+  const [viewOnce, setViewOnce] = useState(false);
   const [sending, setSending] = useState(false);
 
   if (!isOpen || !file || !previewUrl) return null;
@@ -30,8 +31,9 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
     if (sending) return;
     setSending(true);
     try {
-      await onSend(file, caption);
+      await onSend(file, caption, viewOnce);
       setCaption('');
+      setViewOnce(false);
       onClose();
     } catch (err) {
       console.error('Error sending media:', err);
@@ -41,32 +43,41 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4 backdrop-blur-xl animate-in fade-in select-none">
-      <div className="relative flex h-full max-h-[640px] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-[#111b21] border border-[#222d34] shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-0 sm:p-4 backdrop-blur-xl animate-in fade-in select-none">
+      <div className="relative flex h-[100dvh] sm:h-full sm:max-h-[660px] w-full max-w-lg flex-col overflow-hidden sm:rounded-3xl bg-[#111b21] sm:border border-[#222d34] shadow-2xl">
         {/* Top Bar */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-[#202c33] px-4 py-3 z-10">
+        <div className="flex items-center justify-between border-b border-white/10 bg-[#202c33] px-4 py-3 z-10 safe-top">
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
+            aria-label="Cancel photo"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#8696a0] hover:bg-[#111b21] hover:text-white transition"
           >
             <X className="h-5 w-5" />
           </button>
-          <span className="text-xs font-semibold text-white">Send Photo</span>
-          <div className="w-8" />
+          <div className="text-center">
+            <span className="text-xs font-semibold text-white block">Send Photo</span>
+            {viewOnce && (
+              <span className="text-[10px] font-semibold text-[#25d366]">
+                View once enabled
+              </span>
+            )}
+          </div>
+          <div className="w-10" />
         </div>
 
         {/* Media Preview Area */}
-        <div className="relative flex-1 flex items-center justify-center bg-black overflow-hidden p-2">
+        <div className="relative flex-1 flex items-center justify-center bg-black overflow-hidden p-3">
           <img
             src={previewUrl}
             alt="Preview"
-            className="max-h-full max-w-full object-contain rounded-lg shadow-md"
+            className="max-h-full max-w-full object-contain rounded-xl shadow-md"
           />
         </div>
 
-        {/* Caption & Send Bar */}
-        <div className="border-t border-[#222d34] bg-[#202c33] p-3 px-4 flex items-center gap-2">
-          <div className="relative flex-1">
+        {/* Caption, View-Once Toggle & Send Bar */}
+        <div className="border-t border-[#222d34] bg-[#202c33] px-3 sm:px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-2">
+          <div className="relative flex-1 flex items-center gap-1.5 rounded-2xl bg-[#2a3942] px-3 py-1.5">
             <input
               type="text"
               value={caption}
@@ -75,16 +86,37 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
                 if (e.key === 'Enter') handleSend();
               }}
               placeholder="Add a caption..."
-              className="w-full rounded-2xl bg-[#2a3942] px-4 py-2.5 text-xs text-white placeholder:text-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#25d366]"
+              className="w-full bg-transparent py-1.5 text-[16px] sm:text-xs text-white placeholder:text-[#8696a0] focus:outline-none"
               autoFocus
             />
+
+            {/* View Once Toggle */}
+            <button
+              type="button"
+              onClick={() => setViewOnce((v) => !v)}
+              title={viewOnce ? 'View once enabled' : 'Set as View Once photo'}
+              aria-label="Toggle View Once photo"
+              className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border transition ${
+                viewOnce
+                  ? 'border-[#25d366] bg-[#00a884] text-[#0b141a] font-black shadow'
+                  : 'border-[#8696a0]/40 text-[#8696a0] hover:text-white hover:border-white/50'
+              }`}
+            >
+              {viewOnce ? (
+                <span className="text-xs font-extrabold">1</span>
+              ) : (
+                <Timer className="h-4 w-4" />
+              )}
+            </button>
           </div>
 
           <button
+            type="button"
             onClick={handleSend}
             disabled={sending}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-lg hover:bg-[#009374] disabled:opacity-50 transition"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#00a884] text-[#0b141a] shadow-lg hover:bg-[#06cf9c] disabled:opacity-50 transition active:scale-95"
             title="Send photo"
+            aria-label="Send photo"
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

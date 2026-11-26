@@ -303,7 +303,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
   const progressPct = Math.min(100, (currentTime / effectiveDuration) * 100);
 
   return (
-    <div className="flex items-center gap-2.5 py-1 min-w-[240px] max-w-[320px] select-none">
+    <div className="flex items-center gap-2.5 py-1 min-w-[205px] sm:min-w-[245px] max-w-[320px] w-full select-none pr-3">
       {/* Native audio element */}
       {resolvedSrc && (
         <audio
@@ -336,7 +336,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
       <button
         onClick={togglePlay}
         disabled={isLoading}
-        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white shadow-md transition hover:scale-105 active:scale-95 disabled:opacity-75 ${
+        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white shadow-md transition hover:scale-105 active:scale-95 disabled:opacity-75 ${
           hasError
             ? 'bg-rose-600 hover:bg-rose-700'
             : hasPlayed
@@ -392,17 +392,18 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
 
         {/* Bottom Time & Speed Bar */}
         <div className="flex items-center justify-between text-[11px] font-mono leading-none">
-          <span className="text-[#8696a0]">
+          <span className="tabular-nums text-[#8696a0]">
             {isPlaying ? formatTime(currentTime) : formatTime(totalDuration || initialDuration || 0)}
           </span>
 
           {/* Speed Toggle Pill */}
           <button
+            type="button"
             onClick={cycleSpeed}
-            className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition ${
+            className={`rounded-full px-2 py-1 text-[10px] font-bold transition ${
               speedIndex > 0
-                ? 'bg-[#00a884]/20 text-[#00a884]'
-                : 'text-[#8696a0] hover:text-[#e9edef]'
+                ? 'bg-[#00a884]/25 text-[#25d366]'
+                : 'bg-white/10 text-[#d1d7db] hover:text-white'
             }`}
             title="Playback speed"
           >

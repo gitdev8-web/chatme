@@ -21,7 +21,6 @@ import { ConversationItem } from './ConversationItem';
 import { Avatar } from '../common/Avatar';
 import { ConversationSkeleton } from '../common/LoadingSkeleton';
 import { EmptyState } from '../common/EmptyState';
-import { subscribeToStatusStories } from '../../services/statusService';
 import { UserStatusStory } from '../../types';
 import { ProfileDrawer } from '../profile/ProfileDrawer';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
@@ -59,10 +58,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     loadingConversations,
     activeFilter,
     setActiveFilter,
+    statusStories,
+    hasUnreadStatuses,
   } = useChat();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statuses, setStatuses] = useState<UserStatusStory[]>([]);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
@@ -87,14 +87,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [showMenuDropdown]);
-
-  // Subscribe to live status updates
-  useEffect(() => {
-    const unsub = subscribeToStatusStories((list) => {
-      setStatuses(list);
-    });
-    return () => unsub();
-  }, []);
 
   // Filter & sort (pinned first, then updatedAt desc)
   const filteredConversations = conversations
@@ -144,10 +136,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     c.archivedBy?.includes(user?.uid || '')
   ).length;
 
-  const hasUnreadStories = statuses.some(
-    (s) => s.userId !== user?.uid && !s.viewedBy?.includes(user?.uid || '')
-  );
-
   return (
     <aside className="relative flex h-full w-full flex-col border-r border-[#222d34] bg-[#111b21] select-none overflow-hidden">
       {/* Left Slide-over Drawers */}
@@ -173,11 +161,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       {/* Top Header */}
-      <div className="flex h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-4 py-2.5 z-10 flex-shrink-0">
+      <div className="flex h-14 md:h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-3.5 sm:px-4 py-2 z-10 flex-shrink-0">
         <button
           type="button"
           onClick={() => setIsProfileDrawerOpen(true)}
-          className="flex items-center gap-2.5 cursor-pointer group rounded-xl p-1 -ml-1 hover:bg-[#2a3942]/50 transition"
+          className="flex items-center gap-2.5 cursor-pointer group rounded-xl p-1 -ml-1 hover:bg-[#2a3942]/50 transition min-h-[44px]"
           title="My Profile"
         >
           <Avatar
@@ -187,16 +175,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             isOnline={true}
             showPresence={true}
           />
-          <span className="text-sm font-bold tracking-tight text-[#e9edef] hidden sm:inline">
+          <span className="text-base sm:text-sm font-bold tracking-tight text-[#e9edef]">
             DEV CHAT
           </span>
         </button>
 
         {/* Right Action Icons */}
-        <div className="flex items-center gap-1 text-[#aebac1]">
+        <div className="flex items-center gap-0.5 sm:gap-1 text-[#aebac1]">
           <button
             onClick={onOpenGroupsHub}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="hidden md:flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
             title="Communities & Groups"
             aria-label="Communities and Groups"
           >
@@ -205,19 +193,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={onOpenStatus}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="hidden md:flex relative h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
             title="Status Stories"
             aria-label="Status Stories"
           >
             <CircleDashed className="h-5 w-5" />
-            {hasUnreadStories && (
+            {hasUnreadStatuses && (
               <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#25d366] ring-2 ring-[#202c33]" />
             )}
           </button>
 
           <button
             onClick={onOpenContacts}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="hidden md:flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
             title="Calls & Contacts"
             aria-label="Calls and Contacts"
           >
@@ -226,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={() => setIsNewChatDrawerOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+            className="flex h-11 w-11 md:h-10 md:w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] active:scale-95 transition"
             title="New chat"
             aria-label="Start new chat"
           >
@@ -235,13 +223,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <ThemeToggle />
 
-          <PWAInstallButton compact={true} />
+          <div className="hidden sm:block">
+            <PWAInstallButton compact={true} />
+          </div>
 
           {/* 3-Dots Menu Dropdown */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] transition"
+              className="flex h-11 w-11 md:h-10 md:w-10 items-center justify-center rounded-full hover:bg-[#374248] hover:text-[#e9edef] active:scale-95 transition"
               title="Menu"
               aria-label="Menu"
             >
@@ -347,7 +337,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Search Bar & Filter Unread Toggle */}
-      <div className="p-3 border-b border-[#222d34]/60 bg-[#111b21] flex items-center gap-2 flex-shrink-0">
+      <div className="px-3 py-2.5 border-b border-[#222d34]/60 bg-[#111b21] flex items-center gap-2 flex-shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
           <input
@@ -355,14 +345,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search or start new chat"
-            className="w-full rounded-xl border border-transparent bg-[#202c33] pl-10 pr-8 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884] transition"
+            className="w-full rounded-xl border border-transparent bg-[#202c33] pl-10 pr-9 py-2 text-[15px] md:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884] transition"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[#8696a0] hover:text-[#e9edef]"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-[#8696a0] hover:text-[#e9edef]"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -373,7 +363,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() =>
             setActiveFilter(activeFilter === 'unread' ? 'all' : 'unread')
           }
-          className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
+          className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
             activeFilter === 'unread'
               ? 'bg-[#00a884] text-[#0b141a] shadow-sm'
               : 'text-[#8696a0] hover:bg-[#202c33] hover:text-[#e9edef]'
@@ -458,7 +448,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isActive={conv.id === activeConversationId}
               currentUserId={user?.uid || ''}
               userCache={userCache}
-              userStatusStories={statuses}
+              userStatusStories={statusStories}
               onViewStatus={(stories) => {
                 setActiveStoryList(stories);
                 setIsStoryViewerOpen(true);
@@ -477,7 +467,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Floating Action Button (FAB) for New Chat */}
       <button
         onClick={() => setIsNewChatDrawerOpen(true)}
-        className="absolute right-4 bottom-20 md:bottom-6 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#0b141a] shadow-2xl hover:bg-[#06cf9c] hover:scale-105 active:scale-95 transition-all duration-200 group ring-4 ring-[#111b21]/70"
+        className="absolute right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-6 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-[#0b141a] shadow-2xl hover:bg-[#06cf9c] hover:scale-105 active:scale-95 transition-all duration-200 group ring-4 ring-[#111b21]/70"
         title="Start New Chat"
         aria-label="Start New Chat"
       >

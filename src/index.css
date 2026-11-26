@@ -2,10 +2,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root, [data-theme="dark"] {
-  --chat-bg-deep: #0c1317;
+  --chat-bg-deep: #0b1216;
   --chat-bg-main: #0b141a;
   --chat-panel-dark: #111b21;
-  --chat-header-dark: #202c33;
+  --chat-header-dark: #1d282f;
   --chat-hover-dark: #202c33;
   --chat-active-dark: #2a3942;
   --chat-input-dark: #202c33;
@@ -28,7 +28,7 @@
   --chat-panel-dark: #ffffff;
   --chat-header-dark: #f0f2f5;
   --chat-hover-dark: #f5f6f6;
-  --chat-active-dark: #e9edef;
+  --chat-active-dark: #e4e9ec;
   --chat-input-dark: #ffffff;
   --chat-bubble-outgoing: #005c4b;
   --chat-bubble-incoming: #ffffff;
@@ -57,13 +57,19 @@
 
 [data-theme="light"] .bg-\[\#111b21\],
 [data-theme="light"] .bg-\[\#111b21\]\/95,
-[data-theme="light"] .bg-\[\#111b21\]\/90 {
+[data-theme="light"] .bg-\[\#111b21\]\/90,
+[data-theme="light"] .bg-\[\#111b21\]\/70 {
   background-color: var(--chat-panel-dark) !important;
 }
 
 [data-theme="light"] .bg-\[\#202c33\],
 [data-theme="light"] .bg-\[\#202c33\]\/95,
-[data-theme="light"] .bg-\[\#182229\] {
+[data-theme="light"] .bg-\[\#202c33\]\/70,
+[data-theme="light"] .bg-\[\#202c33\]\/50,
+[data-theme="light"] .bg-\[\#182229\],
+[data-theme="light"] .bg-\[\#182229\]\/95,
+[data-theme="light"] .bg-\[\#222e35\],
+[data-theme="light"] .bg-\[\#233138\] {
   background-color: var(--chat-header-dark) !important;
 }
 
@@ -82,7 +88,8 @@
   color: #111b21 !important;
 }
 
-[data-theme="light"] .text-\[\#8696a0\] {
+[data-theme="light"] .text-\[\#8696a0\],
+[data-theme="light"] .text-\[\#aebac1\] {
   color: #54656f !important;
 }
 
@@ -99,7 +106,7 @@
 }
 
 [data-theme="light"] .bg-\[\#005c4b\] .text-\[\#8696a0\] {
-  color: rgba(255, 255, 255, 0.78) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 html, body {
@@ -148,13 +155,194 @@ input, textarea {
   padding-right: max(env(safe-area-inset-right, 0px), 0px);
 }
 
-/* Chat pattern wallpaper background */
+/* Smooth GPU-composited motion system (replaces missing tailwindcss-animate utilities) */
+@keyframes devchatFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes devchatSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes devchatSlideUpSm {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes devchatZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes devchatMsgEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes devchatTypingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes devchatShimmerSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes devchatTargetFlash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(37, 211, 102, 0.25);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, 0);
+  }
+}
+
+.animate-in {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: devchatFadeIn;
+}
+
+.slide-in-from-bottom,
+.slide-in-from-bottom-4 {
+  animation-name: devchatSlideUp;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: devchatSlideUpSm;
+}
+
+@media (min-width: 640px) {
+  .sm\:zoom-in-95 {
+    animation-name: devchatZoomIn;
+  }
+}
+
+.animate-msg-in {
+  animation: devchatMsgEnter 170ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-shimmer {
+  animation: devchatShimmerSlide 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-target-flash {
+  animation: devchatTargetFlash 1.2s ease-out;
+}
+
+.typing-dot {
+  animation: devchatTypingBounce 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-msg-in,
+  .animate-shimmer,
+  .typing-dot,
+  .animate-target-flash {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Chat pattern wallpaper background & custom presets */
 .devchat-pattern-bg {
   background-color: var(--chat-bg-main);
   background-image:
-    radial-gradient(circle at 50% 50%, rgba(37, 211, 102, 0.04) 0%, transparent 80%),
-    radial-gradient(circle at 10% 20%, rgba(83, 189, 235, 0.025) 0%, transparent 60%),
-    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.025) 0, rgba(0, 0, 0, 0.025) 1px, transparent 0, transparent 40px);
+    radial-gradient(circle at 22% 18%, rgba(0, 168, 132, 0.065) 0%, transparent 55%),
+    radial-gradient(circle at 82% 78%, rgba(83, 189, 235, 0.04) 0%, transparent 55%),
+    radial-gradient(rgba(134, 150, 160, 0.08) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+}
+
+[data-theme="light"] .devchat-pattern-bg {
+  background-color: #efeae2;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(0, 168, 132, 0.05) 0%, transparent 50%),
+    radial-gradient(rgba(84, 101, 111, 0.08) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px;
+}
+
+.wallpaper-emerald {
+  background-color: #071916;
+  background-image:
+    radial-gradient(circle at 20% 25%, rgba(0, 168, 132, 0.16) 0%, transparent 55%),
+    radial-gradient(circle at 80% 75%, rgba(37, 211, 102, 0.1) 0%, transparent 55%),
+    linear-gradient(rgba(0, 168, 132, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 168, 132, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px;
+}
+
+.wallpaper-midnight {
+  background-color: #090e17;
+  background-image:
+    radial-gradient(circle at 80% 15%, rgba(56, 189, 248, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 15% 85%, rgba(99, 102, 241, 0.1) 0%, transparent 45%);
+}
+
+.wallpaper-obsidian {
+  background-color: #080c10;
+  background-image: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.025) 0%, transparent 60%);
+}
+
+.wallpaper-forest-dots {
+  background-color: #0b141a;
+  background-image: radial-gradient(rgba(37, 211, 102, 0.1) 1.25px, transparent 1.25px);
+  background-size: 20px 20px;
 }
 
 /* Message speech bubble tails */
