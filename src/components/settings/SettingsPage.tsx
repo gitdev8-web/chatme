@@ -54,6 +54,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [previewsEnabled, setPreviewsEnabled] = useState<boolean>(
     () => typeof window === 'undefined' || localStorage.getItem('devchat_notif_previews') !== 'false'
   );
+  const [onlineAlertsEnabled, setOnlineAlertsEnabled] = useState<boolean>(
+    () => typeof window === 'undefined' || localStorage.getItem('devchat_online_alerts') !== 'false'
+  );
 
   const handleToggle = async (key: string, value: boolean) => {
     try {
@@ -74,6 +77,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setPreviewsEnabled(checked);
     localStorage.setItem('devchat_notif_previews', String(checked));
     showToast(checked ? 'Message previews enabled' : 'Message previews hidden', 'info');
+  };
+
+  const handleOnlineAlertsToggle = (checked: boolean) => {
+    setOnlineAlertsEnabled(checked);
+    localStorage.setItem('devchat_online_alerts', String(checked));
+    showToast(checked ? 'Contact online alerts enabled' : 'Contact online alerts muted', 'info');
   };
 
   const handlePasswordReset = async () => {
@@ -365,6 +374,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     type="checkbox"
                     checked={previewsEnabled}
                     onChange={(e) => handlePreviewsToggle(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
+                  />
+                </label>
+
+                <label className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between cursor-pointer">
+                  <div>
+                    <h4 className="text-xs font-bold text-[#e9edef]">Contact Online Alerts</h4>
+                    <p className="text-[11px] text-[#8696a0] mt-0.5">
+                      Get notified when a contact comes online on DEV CHAT
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={onlineAlertsEnabled}
+                    onChange={(e) => handleOnlineAlertsToggle(e.target.checked)}
                     className="h-4 w-4 rounded accent-[#00a884] cursor-pointer"
                   />
                 </label>

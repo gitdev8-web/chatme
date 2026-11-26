@@ -187,6 +187,17 @@ input, textarea {
   }
 }
 
+@keyframes devchatSlideDownSm {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes devchatZoomIn {
   from {
     opacity: 0;
@@ -252,12 +263,17 @@ input, textarea {
 }
 
 .slide-in-from-bottom,
+.slide-in-from-bottom-3,
 .slide-in-from-bottom-4 {
   animation-name: devchatSlideUp;
 }
 
 .slide-in-from-bottom-2 {
   animation-name: devchatSlideUpSm;
+}
+
+.slide-in-from-top-3 {
+  animation-name: devchatSlideDownSm;
 }
 
 @media (min-width: 640px) {

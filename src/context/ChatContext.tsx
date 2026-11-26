@@ -57,6 +57,7 @@ import {
 } from '../services/chatService';
 import { uploadFileWithProgress } from '../services/storageService';
 import { subscribeToAllPresence } from '../services/presenceService';
+import { isUserOnline } from '../utils/presenceUtils';
 
 interface ChatContextType {
   conversations: Conversation[];
@@ -135,10 +136,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const readReceiptsEnabledRef = useRef<boolean>(profile?.readReceipts !== false);
   const unreadMsgIdsRef = useRef<string[]>([]);
   const activeLastMsgIdRef = useRef<string | undefined>(undefined);
+  const activeConversationIdRef = useRef<string | null>(activeConversationId);
+  const userCacheRef = useRef<Record<string, UserProfile>>(userCache);
+  const profileRef = useRef<UserProfile | null>(profile);
+  const prevOnlineMapRef = useRef<Record<string, boolean>>({});
+  const onlineCooldownRef = useRef<Record<string, number>>({});
+  const initialUsersLoadedRef = useRef<boolean>(false);
+  const startDirectChatRef = useRef<(uid: string) => Promise<string>>(async () => '');
 
   useEffect(() => {
     readReceiptsEnabledRef.current = profile?.readReceipts !== false;
-  }, [profile?.readReceipts]);
+    profileRef.current = profile;
+  }, [profile]);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    userCacheRef.current = userCache;
+  }, [userCache]);
 
   // Global live subscription to status stories across all users
   useEffect(() => {
@@ -181,10 +198,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [user]
   );
 
-  // Helper to fetch and cache user profiles
+  // Helper to fetch and cache user profiles (stable reference via userCacheRef)
   const getUserProfile = useCallback(
     async (uid: string): Promise<UserProfile | null> => {
-      if (userCache[uid]) return userCache[uid];
+      if (userCacheRef.current[uid]) return userCacheRef.current[uid];
       try {
         const snap = await getDoc(doc(db, 'users', uid));
         if (snap.exists()) {
@@ -192,16 +209,93 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserCache((prev) => ({ ...prev, [uid]: uProfile }));
           return uProfile;
         }
-      } catch (err) {
+      } catch {
         // Continue gracefully
       }
       return null;
     },
-    [userCache]
+    []
   );
 
-  // Real-time presence listener to keep userCache states instantly synchronized
+  const notifyUserCameOnline = useCallback(
+    (uProfile: UserProfile) => {
+      if (!user || !uProfile?.uid || uProfile.uid === user.uid) return;
+      if (uProfile.isDisabled || uProfile.showOnlineStatus === false) return;
+      if (profileRef.current?.blockedUserIds?.includes(uProfile.uid)) return;
+      if (typeof window !== 'undefined' && localStorage.getItem('devchat_online_alerts') === 'false') {
+        return;
+      }
+
+      const now = Date.now();
+      const lastNotified = onlineCooldownRef.current[uProfile.uid] || 0;
+      if (now - lastNotified < 60000) return;
+
+      onlineCooldownRef.current[uProfile.uid] = now;
+      notify({
+        kind: 'online',
+        title: uProfile.displayName || 'DEV CHAT Contact',
+        body: 'is now online',
+        icon: uProfile.photoURL,
+        senderName: uProfile.displayName,
+        onClick: () => {
+          void startDirectChatRef.current(uProfile.uid);
+        },
+      });
+    },
+    [user, notify]
+  );
+
+  // Real-time Firestore + RTDB presence listener to keep userCache synced & notify when contacts come online
   useEffect(() => {
+    if (!user) {
+      initialUsersLoadedRef.current = false;
+      prevOnlineMapRef.current = {};
+      return;
+    }
+
+    initialUsersLoadedRef.current = false;
+    prevOnlineMapRef.current = {};
+
+    const usersQuery = query(
+      collection(db, 'users'),
+      orderBy('lastSeen', 'desc'),
+      limit(100)
+    );
+
+    const unsubUsers = onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const updates: Record<string, UserProfile> = {};
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as UserProfile;
+          const uid = data.uid || docSnap.id;
+          const uProfile: UserProfile = { ...data, uid };
+          updates[uid] = uProfile;
+
+          if (uid !== user.uid) {
+            const nowOnline = isUserOnline(uProfile);
+            const wasOnline = prevOnlineMapRef.current[uid];
+
+            if (initialUsersLoadedRef.current && wasOnline !== true && nowOnline) {
+              notifyUserCameOnline(uProfile);
+            }
+            prevOnlineMapRef.current[uid] = nowOnline;
+          }
+        });
+
+        initialUsersLoadedRef.current = true;
+
+        setUserCache((prev) => ({
+          ...prev,
+          ...updates,
+        }));
+      },
+      () => {
+        initialUsersLoadedRef.current = true;
+      }
+    );
+
     const unsubPresence = subscribeToAllPresence((presenceMap) => {
       setUserCache((prev) => {
         let changed = false;
@@ -214,12 +308,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ? new Date(p.lastSeen).toISOString()
                 : p.lastSeen;
             if (next[uid].isOnline !== p.isOnline || next[uid].lastSeen !== pTime) {
-              next[uid] = {
+              const updatedProfile: UserProfile = {
                 ...next[uid],
                 isOnline: p.isOnline,
                 lastSeen: pTime,
               };
+              next[uid] = updatedProfile;
               changed = true;
+
+              if (uid !== user.uid && initialUsersLoadedRef.current) {
+                const nowOnline = isUserOnline(updatedProfile);
+                const wasOnline = prevOnlineMapRef.current[uid];
+                if (wasOnline !== true && nowOnline) {
+                  notifyUserCameOnline(updatedProfile);
+                }
+                prevOnlineMapRef.current[uid] = nowOnline;
+              }
             }
           }
         });
@@ -227,18 +331,36 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     });
 
-    return () => unsubPresence();
-  }, []);
+    // Sweep stale presence states periodically so offline->online transitions are re-detected
+    const staleSweepInterval = setInterval(() => {
+      const cached = userCacheRef.current;
+      Object.keys(cached).forEach((uid) => {
+        if (uid !== user.uid) {
+          prevOnlineMapRef.current[uid] = isUserOnline(cached[uid]);
+        }
+      });
+    }, 20000);
+
+    return () => {
+      unsubUsers();
+      unsubPresence();
+      clearInterval(staleSweepInterval);
+    };
+  }, [user, notifyUserCameOnline]);
 
   // Listen to conversations for current user
   useEffect(() => {
     if (!user) {
       setConversations([]);
+      notifiedMsgIdsRef.current.clear();
       setLoadingConversations(false);
       return;
     }
 
     setLoadingConversations(true);
+    let isInitialConvSnapshot = true;
+    notifiedMsgIdsRef.current.clear();
+
     const q = query(
       collection(db, 'conversations'),
       where('participantIds', 'array-contains', user.uid)
@@ -265,11 +387,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setConversations(convList);
         setLoadingConversations(false);
 
+        const currentActiveId = activeConversationIdRef.current;
+        const currentCache = userCacheRef.current;
+
         // Preload participant user profiles and mark unread conversations as delivered
         convList.forEach((conv) => {
           conv.participantIds.forEach((uid) => {
-            if (uid !== user.uid && !userCache[uid]) {
-              getUserProfile(uid);
+            if (uid !== user.uid && !currentCache[uid]) {
+              void getUserProfile(uid);
             }
           });
 
@@ -279,36 +404,64 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             conv.lastMessage.senderId !== user.uid &&
             conv.lastMessage.id
           ) {
-            if (activeConversationId !== conv.id) {
-              markMessagesAsDelivered(conv.id, user.uid, [conv.lastMessage.id]);
+            if (currentActiveId !== conv.id) {
+              void markMessagesAsDelivered(conv.id, user.uid, [conv.lastMessage.id], conv.lastMessage.id);
             }
 
-            // Trigger notification if message has not been notified yet & conversation isn't muted
-            const isMuted = conv.mutedBy?.includes(user.uid);
-            if (!notifiedMsgIdsRef.current.has(conv.lastMessage.id) && !isMuted && activeConversationId !== conv.id) {
+            // Do not flood old message popups on initial page load
+            if (isInitialConvSnapshot) {
               notifiedMsgIdsRef.current.add(conv.lastMessage.id);
+              return;
+            }
 
-              // Get sender details
+            const isMuted = conv.mutedBy?.includes(user.uid);
+            const shouldNotify =
+              !notifiedMsgIdsRef.current.has(conv.lastMessage.id) &&
+              !isMuted &&
+              (currentActiveId !== conv.id || document.visibilityState === 'hidden');
+
+            if (shouldNotify) {
+              const msgId = conv.lastMessage.id;
+              const msgText = conv.lastMessage.text || 'Sent an attachment';
+              const fallbackSenderName = conv.lastMessage.senderName || 'DEV CHAT User';
               const senderId = conv.lastMessage.senderId;
-              const sender = userCache[senderId];
-              const senderName =
-                conv.type === 'group'
-                  ? `${sender?.displayName || 'Someone'} in ${conv.name}`
-                  : sender?.displayName || 'DEV CHAT User';
-              const senderIcon = sender?.photoURL || conv.photoURL;
 
-              notify({
-                title: senderName,
-                body: conv.lastMessage.text || 'Sent an attachment',
-                icon: senderIcon,
-                conversationId: conv.id,
-                onClick: () => setActiveConversationId(conv.id),
-              });
+              notifiedMsgIdsRef.current.add(msgId);
+
+              const cachedSender = currentCache[senderId];
+              const dispatchMsgPopup = (senderProfile?: UserProfile | null) => {
+                const resolvedName = senderProfile?.displayName || fallbackSenderName;
+                const popupTitle =
+                  conv.type === 'group'
+                    ? `${resolvedName} in ${conv.name || 'Group'}`
+                    : resolvedName;
+                const popupIcon = senderProfile?.photoURL || conv.photoURL;
+
+                notify({
+                  kind: 'message',
+                  title: popupTitle,
+                  body: msgText,
+                  icon: popupIcon,
+                  senderName: resolvedName,
+                  conversationId: conv.id,
+                  onClick: () => setActiveConversationId(conv.id),
+                });
+              };
+
+              if (cachedSender) {
+                dispatchMsgPopup(cachedSender);
+              } else {
+                void getUserProfile(senderId).then((fetched) => {
+                  dispatchMsgPopup(fetched);
+                });
+              }
             } else {
               notifiedMsgIdsRef.current.add(conv.lastMessage.id);
             }
           }
         });
+
+        isInitialConvSnapshot = false;
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, 'conversations');
@@ -317,7 +470,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, notify, getUserProfile]);
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
 
@@ -479,12 +632,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, activeConversation?.id]);
 
   // Start direct chat
-  const startDirectChat = async (targetUid: string): Promise<string> => {
-    if (!user) throw new Error('Not authenticated');
-    const convId = await getOrCreateDirectConversation(user.uid, targetUid);
-    setActiveConversationId(convId);
-    return convId;
-  };
+  const startDirectChat = useCallback(
+    async (targetUid: string): Promise<string> => {
+      if (!user) throw new Error('Not authenticated');
+      const convId = await getOrCreateDirectConversation(user.uid, targetUid);
+      setActiveConversationId(convId);
+      return convId;
+    },
+    [user]
+  );
+
+  useEffect(() => {
+    startDirectChatRef.current = startDirectChat;
+  }, [startDirectChat]);
 
   // Create new group
   const createNewGroup = async (
