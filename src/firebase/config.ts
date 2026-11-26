@@ -21,7 +21,7 @@ const resolvedConfig = {
     import.meta.env.VITE_FIREBASE_DATABASE_URL ||
     `https://${defaultFirebaseConfig.projectId}-default-rtdb.firebaseio.com`,
   firestoreDatabaseId:
-    import.meta.env.VITE_FIREBASE_DATABASE_ID || defaultFirebaseConfig.firestoreDatabaseId || '(default)',
+    import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultFirebaseConfig as any).firestoreDatabaseId || '(default)',
   storageBucket:
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaultFirebaseConfig.storageBucket,
   messagingSenderId:
