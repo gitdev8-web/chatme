@@ -26,12 +26,21 @@ import {
 import { auth, db } from '../firebase/config';
 import { UserProfile } from '../types';
 import { initializePresence, setUserOnlineState } from '../services/presenceService';
+import {
+  authorizeGoogleMeet,
+  buildMeetGoogleProvider,
+  clearMeetAccessToken,
+  setMeetAccessToken,
+  subscribeMeetAuthState,
+} from '../services/googleMeetService';
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   isAdmin: boolean;
   loading: boolean;
+  meetConnected: boolean;
+  connectGoogleMeet: () => Promise<string>;
   registerWithEmail: (
     email: string,
     pass: string,
@@ -64,6 +73,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [meetConnected, setMeetConnected] = useState<boolean>(false);
+
+  useEffect(() => {
+    return subscribeMeetAuthState(setMeetConnected);
+  }, []);
 
   // Sync profile from Firestore
   const fetchUserProfile = async (currentUser: User): Promise<UserProfile | null> => {
@@ -176,6 +190,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null);
         setIsAdmin(false);
+        clearMeetAccessToken();
         if (presenceCleanup) {
           presenceCleanup();
           presenceCleanup = null;
@@ -280,8 +295,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    const provider = buildMeetGoogleProvider();
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      setMeetAccessToken(credential.accessToken);
+    }
+  };
+
+  const connectGoogleMeet = async (): Promise<string> => {
+    return authorizeGoogleMeet();
   };
 
   const resetPassword = async (email: string) => {
@@ -289,6 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    clearMeetAccessToken();
     await updatePresence(false);
     await signOut(auth);
     setProfile(null);
@@ -457,6 +481,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         isAdmin,
         loading,
+        meetConnected,
+        connectGoogleMeet,
         registerWithEmail,
         loginWithEmail,
         loginWithGoogle,

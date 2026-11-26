@@ -33,7 +33,7 @@ export interface LastMessageInfo {
   senderId: string;
   senderName: string;
   timestamp: string;
-  type: 'text' | 'image' | 'file' | 'voice' | 'poll' | 'location' | 'contact' | 'system';
+  type: 'text' | 'image' | 'file' | 'voice' | 'poll' | 'location' | 'contact' | 'meet' | 'system';
   readBy?: string[];
   deliveredTo?: string[];
 }
@@ -77,6 +77,7 @@ export type MessageType =
   | 'poll'
   | 'location'
   | 'contact'
+  | 'meet'
   | 'system';
 
 export interface ReplyReference {
@@ -113,6 +114,16 @@ export interface SharedContactData {
   phoneNumber?: string;
 }
 
+export interface MeetInviteData {
+  meetingUri: string;
+  meetingCode: string;
+  spaceName: string;
+  callId?: string;
+  hostName?: string;
+  accessType?: 'OPEN' | 'TRUSTED' | 'RESTRICTED';
+  createdAt: string;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -138,6 +149,7 @@ export interface Message {
   poll?: PollData;
   location?: LocationData;
   contactCard?: SharedContactData;
+  meet?: MeetInviteData;
   reactions?: Record<string, string[]>; // emoji: [uid1, uid2...]
   starredBy?: string[];
   readBy?: string[];
@@ -192,6 +204,10 @@ export interface CallSession {
   receiverId: string;
   receiverName?: string;
   callType: 'audio' | 'video';
+  provider?: 'webrtc' | 'google-meet';
+  meetUri?: string;
+  meetCode?: string;
+  meetSpaceName?: string;
   status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'missed';
   createdAt: string;
   startedAt?: string;

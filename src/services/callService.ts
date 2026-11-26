@@ -25,7 +25,13 @@ export async function initiateCall(
   callerPhoto: string | undefined,
   receiverId: string,
   receiverName: string | undefined,
-  callType: 'audio' | 'video'
+  callType: 'audio' | 'video',
+  options?: {
+    provider?: 'webrtc' | 'google-meet';
+    meetUri?: string;
+    meetCode?: string;
+    meetSpaceName?: string;
+  }
 ): Promise<string> {
   const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const now = new Date().toISOString();
@@ -38,6 +44,10 @@ export async function initiateCall(
     receiverId,
     receiverName: receiverName || 'Contact',
     callType,
+    provider: options?.provider || 'webrtc',
+    meetUri: options?.meetUri,
+    meetCode: options?.meetCode,
+    meetSpaceName: options?.meetSpaceName,
     status: 'ringing',
     createdAt: now,
   };

@@ -26,6 +26,7 @@ import { BottomNav, BottomNavTab } from './components/navigation/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { IncomingCallModal } from './components/calls/IncomingCallModal';
 import { CallModal } from './components/calls/CallModal';
+import { GoogleMeetModal } from './components/calls/GoogleMeetModal';
 import { PWAUpdateToast } from './components/common/PWAUpdateToast';
 import { subscribeToIncomingCalls } from './services/callService';
 import { CallSession } from './types';
@@ -340,18 +341,33 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
         onDecline={() => setIncomingCall(null)}
       />
 
-      {/* Active Received Call Modal */}
-      {activeCallSession && (
-        <CallModal
-          isOpen={true}
-          isIncoming={true}
-          onClose={() => setActiveCallSession(null)}
-          contactName={activeCallSession.callerName}
-          contactPhoto={activeCallSession.callerPhoto}
-          callType={activeCallSession.callType}
-          callSessionId={activeCallSession.id}
-        />
-      )}
+      {/* Active Received Call Modal (Google Meet for video, WebRTC for audio/legacy) */}
+      {activeCallSession &&
+        (activeCallSession.provider === 'google-meet' && activeCallSession.meetUri ? (
+          <GoogleMeetModal
+            isOpen={true}
+            isIncoming={true}
+            onClose={() => setActiveCallSession(null)}
+            title={activeCallSession.callerName}
+            photoURL={activeCallSession.callerPhoto}
+            callSessionId={activeCallSession.id}
+            initialMeetSpace={{
+              meetingUri: activeCallSession.meetUri,
+              meetingCode: activeCallSession.meetCode || '',
+              spaceName: activeCallSession.meetSpaceName || '',
+            }}
+          />
+        ) : (
+          <CallModal
+            isOpen={true}
+            isIncoming={true}
+            onClose={() => setActiveCallSession(null)}
+            contactName={activeCallSession.callerName}
+            contactPhoto={activeCallSession.callerPhoto}
+            callType={activeCallSession.callType}
+            callSessionId={activeCallSession.id}
+          />
+        ))}
     </div>
   );
 };

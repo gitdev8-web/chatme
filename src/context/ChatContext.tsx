@@ -22,6 +22,7 @@ import { sound } from '../hooks/useSound';
 import {
   Conversation,
   LocationData,
+  MeetInviteData,
   Message,
   MessageType,
   PollData,
@@ -97,6 +98,7 @@ interface ChatContextType {
   sendPollMessage: (poll: PollData) => Promise<void>;
   sendLocationMessage: (location: LocationData) => Promise<void>;
   sendContactMessage: (contact: SharedContactData) => Promise<void>;
+  sendMeetMessage: (meet: MeetInviteData, conversationIdOverride?: string) => Promise<void>;
   votePoll: (messageId: string, optionId: string) => Promise<void>;
   pinMessage: (msg: Message) => Promise<void>;
   unpinMessage: () => Promise<void>;
@@ -897,6 +899,38 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
+  // Send Google Meet video session invite card
+  const sendMeetMessage = async (
+    meet: MeetInviteData,
+    conversationIdOverride?: string
+  ) => {
+    const targetConvId = conversationIdOverride || activeConversationId;
+    if (!user || !targetConvId) return;
+    sound.playSend();
+    const replyRef =
+      !conversationIdOverride && replyingTo
+        ? {
+            messageId: replyingTo.id,
+            senderName: replyingTo.senderName,
+            text: replyingTo.text,
+            type: replyingTo.type,
+          }
+        : null;
+    if (!conversationIdOverride) {
+      setReplyingTo(null);
+    }
+
+    await sendMessage(
+      targetConvId,
+      user.uid,
+      profile?.displayName || user.displayName || 'User',
+      profile?.photoURL || user.photoURL || '',
+      `Google Meet video call (${meet.meetingCode})`,
+      'meet',
+      { meet, replyTo: replyRef }
+    );
+  };
+
   // Vote on poll option
   const votePoll = async (messageId: string, optionId: string) => {
     if (!user || !activeConversationId) return;
@@ -1046,6 +1080,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendPollMessage,
         sendLocationMessage,
         sendContactMessage,
+        sendMeetMessage,
         votePoll,
         pinMessage,
         unpinMessage,

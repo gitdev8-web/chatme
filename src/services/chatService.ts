@@ -23,6 +23,7 @@ import { handleFirestoreError, OperationType } from '../firebase/errors';
 import {
   Conversation,
   LocationData,
+  MeetInviteData,
   Message,
   MessageType,
   ModerationReport,
@@ -183,6 +184,7 @@ export async function sendMessage(
     poll?: PollData;
     location?: LocationData;
     contactCard?: SharedContactData;
+    meet?: MeetInviteData;
   }
 ): Promise<string> {
   const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -221,6 +223,7 @@ export async function sendMessage(
   if (options?.poll) rawMessage.poll = options.poll;
   if (options?.location) rawMessage.location = options.location;
   if (options?.contactCard) rawMessage.contactCard = options.contactCard;
+  if (options?.meet) rawMessage.meet = options.meet;
 
   const cleanMessage = sanitizeForFirestore(rawMessage);
 
@@ -236,6 +239,7 @@ export async function sendMessage(
     else if (type === 'poll') previewText = `📊 Poll: ${options?.poll?.question || text}`;
     else if (type === 'location') previewText = `📍 ${options?.location?.label || 'Location'}`;
     else if (type === 'contact') previewText = `👤 Contact: ${options?.contactCard?.displayName || text}`;
+    else if (type === 'meet') previewText = `📹 Google Meet video call`;
 
     try {
       const convSnap = await getDoc(convRef);

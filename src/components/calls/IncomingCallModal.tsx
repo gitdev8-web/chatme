@@ -68,7 +68,11 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
       <div className="relative flex flex-col items-center w-full max-w-sm rounded-3xl border border-white/10 bg-[#0e161b] p-6 text-center shadow-2xl text-white">
         <div className="flex items-center gap-1.5 text-xs text-[#25d366] font-medium mb-6">
           <Shield className="h-3.5 w-3.5" />
-          <span>DEV CHAT {call.callType === 'video' ? 'Video' : 'Voice'} Call</span>
+          <span>
+            {call.provider === 'google-meet'
+              ? 'Google Meet Video Call'
+              : `DEV CHAT ${call.callType === 'video' ? 'Video' : 'Voice'} Call`}
+          </span>
         </div>
 
         <div className="relative mb-5 flex items-center justify-center">
@@ -85,7 +89,9 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
           {call.callerName}
         </h3>
         <p className="text-xs text-white/65 mt-1">
-          Incoming {call.callType === 'video' ? 'video' : 'voice'} call...
+          {call.provider === 'google-meet'
+            ? `Incoming Google Meet session${call.meetCode ? ` · ${call.meetCode}` : '...'}`
+            : `Incoming ${call.callType === 'video' ? 'video' : 'voice'} call...`}
         </p>
 
         <div className="flex items-center justify-center gap-14 mt-8 w-full">
