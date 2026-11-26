@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Pin,
   VolumeX,
+  Check,
   CheckCheck,
   ChevronDown,
   Archive,
@@ -142,11 +143,30 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     if (!lastMsg) return <span className="text-xs text-[#8696a0]">No messages yet</span>;
 
     const isSelf = lastMsg.senderId === currentUserId;
+    const recipientIds = (conversation.participantIds || []).filter((id) => id !== currentUserId);
+    const readOthers = (lastMsg.readBy || []).filter((id) => id !== currentUserId);
+    const deliveredOthers = (lastMsg.deliveredTo || []).filter((id) => id !== currentUserId);
+    const isLastMsgRead = lastMsg.readBy
+      ? isDirect
+        ? readOthers.length > 0
+        : recipientIds.length > 0 && recipientIds.every((id) => readOthers.includes(id))
+      : recipientIds.length > 0 &&
+        recipientIds.every((id) => (conversation.unreadCounts?.[id] ?? 0) === 0);
+    const isLastMsgDelivered =
+      isLastMsgRead ||
+      deliveredOthers.length > 0 ||
+      !lastMsg.readBy;
 
     return (
       <div className="flex items-center gap-1.5 min-w-0 text-xs text-[#8696a0]">
         {isSelf && (
-          <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb] flex-shrink-0" />
+          isLastMsgRead ? (
+            <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb] flex-shrink-0" aria-label="Read" />
+          ) : isLastMsgDelivered ? (
+            <CheckCheck className="h-3.5 w-3.5 text-[#8696a0] flex-shrink-0" aria-label="Delivered" />
+          ) : (
+            <Check className="h-3.5 w-3.5 text-[#8696a0] flex-shrink-0" aria-label="Sent" />
+          )
         )}
         {lastMsg.type === 'image' && (
           <Camera className="h-3.5 w-3.5 text-[#8696a0] flex-shrink-0" />

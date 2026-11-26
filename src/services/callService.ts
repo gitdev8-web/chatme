@@ -6,9 +6,9 @@
 import {
   collection,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   onSnapshot,
@@ -61,7 +61,7 @@ export function subscribeToCallSession(
     callRef,
     (snap) => {
       if (snap.exists()) {
-        onUpdate(snap.data() as CallSession);
+        onUpdate({ ...(snap.data() as CallSession), id: snap.id });
       } else {
         onUpdate(null);
       }
@@ -90,14 +90,13 @@ export function subscribeToIncomingCalls(
     (snap) => {
       if (!snap.empty) {
         const now = Date.now();
-        // Return most recent ringing call created within 5 minutes (prevents clock skew issues)
+        // Return most recent ringing call created within 2 minutes
         const docs = snap.docs
           .map((d) => ({ ...d.data(), id: d.id } as CallSession))
           .filter((c) => {
-            if (c.status !== 'ringing') return false;
+            if (c.status !== 'ringing' || c.callerId === currentUid) return false;
             const created = new Date(c.createdAt || 0).getTime();
-            // Allow up to 5 minutes tolerance or future clock skew up to 2 minutes
-            return Math.abs(now - created) < 300000;
+            return Math.abs(now - created) < 120000;
           });
 
         if (docs.length > 0) {
@@ -115,15 +114,22 @@ export function subscribeToIncomingCalls(
   );
 }
 
-export async function acceptCall(callId: string): Promise<void> {
+export async function acceptCall(callId: string): Promise<boolean> {
   try {
     const callRef = doc(db, 'calls', callId);
+    const snap = await getDoc(callRef);
+    if (!snap.exists()) return false;
+    const data = snap.data() as CallSession;
+    if (data.status !== 'ringing') return false;
+
     await updateDoc(callRef, {
       status: 'accepted',
       startedAt: new Date().toISOString(),
     });
+    return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}`);
+    return false;
   }
 }
 
@@ -132,6 +138,22 @@ export async function rejectCall(callId: string): Promise<void> {
     const callRef = doc(db, 'calls', callId);
     await updateDoc(callRef, {
       status: 'rejected',
+      endedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}`);
+  }
+}
+
+export async function markCallMissed(callId: string): Promise<void> {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    const snap = await getDoc(callRef);
+    if (!snap.exists()) return;
+    const data = snap.data() as CallSession;
+    if (data.status !== 'ringing') return;
+    await updateDoc(callRef, {
+      status: 'missed',
       endedAt: new Date().toISOString(),
     });
   } catch (err) {
@@ -153,7 +175,7 @@ export async function endCall(callId: string): Promise<void> {
 
 export async function setCallOffer(
   callId: string,
-  offer: { type: string; sdp: string }
+  offer: { type: string; sdp: string; by?: 'caller' | 'receiver' }
 ): Promise<void> {
   try {
     const callRef = doc(db, 'calls', callId);
@@ -167,7 +189,7 @@ export async function setCallOffer(
 
 export async function setCallAnswer(
   callId: string,
-  answer: { type: string; sdp: string }
+  answer: { type: string; sdp: string; by?: 'caller' | 'receiver' }
 ): Promise<void> {
   try {
     const callRef = doc(db, 'calls', callId);

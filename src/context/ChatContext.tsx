@@ -107,6 +107,7 @@ interface ChatContextType {
   starMessage: (messageId: string, shouldStar: boolean) => Promise<void>;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   emitTyping: (isTyping: boolean, activity?: 'typing' | 'recording') => void;
+  markActiveConversationRead: () => void;
   getUserProfile: (uid: string) => Promise<UserProfile | null>;
 }
 
@@ -131,6 +132,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageSoundRef = useRef<string | null>(null);
   const notifiedMsgIdsRef = useRef<Set<string>>(new Set());
+  const readReceiptsEnabledRef = useRef<boolean>(profile?.readReceipts !== false);
+  const unreadMsgIdsRef = useRef<string[]>([]);
+  const activeLastMsgIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    readReceiptsEnabledRef.current = profile?.readReceipts !== false;
+  }, [profile?.readReceipts]);
 
   // Global live subscription to status stories across all users
   useEffect(() => {
@@ -313,10 +321,42 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
 
+  useEffect(() => {
+    activeLastMsgIdRef.current = activeConversation?.lastMessage?.id;
+  }, [activeConversation?.lastMessage?.id]);
+
+  const markActiveConversationRead = useCallback(() => {
+    if (!user || !activeConversationId) return;
+    const unreadIds = unreadMsgIdsRef.current;
+    const isVisible = document.visibilityState === 'visible';
+    const sendReadReceipts = readReceiptsEnabledRef.current;
+    const lastMsgId = activeLastMsgIdRef.current;
+
+    if (unreadIds.length === 0) return;
+
+    if (isVisible) {
+      if (sendReadReceipts) {
+        markConversationAsRead(activeConversationId, user.uid, unreadIds, lastMsgId);
+      } else {
+        markConversationAsRead(activeConversationId, user.uid, [], lastMsgId);
+        markMessagesAsDelivered(activeConversationId, user.uid, unreadIds, lastMsgId);
+      }
+    } else {
+      markMessagesAsDelivered(activeConversationId, user.uid, unreadIds, lastMsgId);
+    }
+  }, [user, activeConversationId]);
+
+  useEffect(() => {
+    if (profile?.readReceipts !== false) {
+      markActiveConversationRead();
+    }
+  }, [profile?.readReceipts, markActiveConversationRead]);
+
   // Listen to messages of active conversation
   useEffect(() => {
     if (!user || !activeConversationId) {
       setMessages([]);
+      unreadMsgIdsRef.current = [];
       setLoadingMessages(false);
       return;
     }
@@ -325,23 +365,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const msgsRef = collection(db, 'conversations', activeConversationId, 'messages');
     const q = query(msgsRef, orderBy('createdAt', 'asc'), limit(300));
 
-    let currentUnreadIds: string[] = [];
-
-    const markActiveAsReadIfVisible = () => {
-      const isVisible = document.visibilityState === 'visible';
-      const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
-      const sendReadReceipts = profile?.readReceipts !== false;
-
-      if (isVisible && isFocused && currentUnreadIds.length > 0) {
-        markConversationAsRead(
-          activeConversationId,
-          user.uid,
-          sendReadReceipts ? currentUnreadIds : []
-        );
-      } else if (currentUnreadIds.length > 0) {
-        markMessagesAsDelivered(activeConversationId, user.uid, currentUnreadIds);
-      }
-    };
+    unreadMsgIdsRef.current = [];
 
     const userClearedAt = activeConversation?.clearedAt?.[user.uid];
     const clearedAtMs = userClearedAt ? new Date(userClearedAt).getTime() : 0;
@@ -376,12 +400,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMessages(msgs);
         setLoadingMessages(false);
 
-        // Filter unread message IDs
-        currentUnreadIds = msgs
+        // Filter unread message IDs from other participants
+        unreadMsgIdsRef.current = msgs
           .filter((m) => m.senderId !== user.uid && (!m.readBy || !m.readBy.includes(user.uid)))
           .map((m) => m.id);
 
-        markActiveAsReadIfVisible();
+        if (msgs.length > 0) {
+          activeLastMsgIdRef.current = msgs[msgs.length - 1].id;
+        }
+
+        markActiveConversationRead();
       },
       (error) => {
         handleFirestoreError(
@@ -394,11 +422,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     const handleWindowFocus = () => {
-      markActiveAsReadIfVisible();
+      markActiveConversationRead();
     };
 
     const handleVisibility = () => {
-      markActiveAsReadIfVisible();
+      markActiveConversationRead();
     };
 
     window.addEventListener('focus', handleWindowFocus);
@@ -431,7 +459,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [user, activeConversationId]);
+  }, [user, activeConversationId, markActiveConversationRead]);
 
   // Real-time listener for active chat partner profile (online presence, last seen, status updates)
   useEffect(() => {
@@ -869,6 +897,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         starMessage,
         reactToMessage,
         emitTyping,
+        markActiveConversationRead,
         getUserProfile,
       }}
     >

@@ -44,6 +44,8 @@ interface MessageBubbleProps {
   userCache: Record<string, UserProfile>;
   isSearchMatch?: boolean;
   isCurrentSearchMatch?: boolean;
+  receiptStatus?: 'sent' | 'delivered' | 'read';
+  receiptLabel?: string;
   onReply: (msg: Message) => void;
   onEdit: (msg: Message) => void;
   onDelete: (messageId: string, forEveryone: boolean) => void;
@@ -72,6 +74,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   userCache,
   isSearchMatch = false,
   isCurrentSearchMatch = false,
+  receiptStatus,
+  receiptLabel,
   onReply,
   onEdit,
   onDelete,
@@ -780,17 +784,48 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {message.isEdited && <span className="text-[9px]">Edited •</span>}
               <span>{formatTime(message.createdAt)}</span>
 
-              {isSelf && (
-                <span className="inline-flex items-center ml-0.5">
-                  {message.readBy && message.readBy.length > 1 ? (
-                    <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" />
-                  ) : message.deliveredTo && message.deliveredTo.length > 1 ? (
-                    <CheckCheck className="h-3.5 w-3.5 text-[#8696a0]" />
-                  ) : (
-                    <Check className="h-3.5 w-3.5 text-[#8696a0]" />
-                  )}
-                </span>
-              )}
+              {isSelf && (() => {
+                const resolvedReceiptStatus: 'sent' | 'delivered' | 'read' =
+                  receiptStatus ||
+                  ((message.readBy || []).some((uid) => uid !== message.senderId)
+                    ? 'read'
+                    : (message.deliveredTo || []).some((uid) => uid !== message.senderId)
+                    ? 'delivered'
+                    : 'sent');
+
+                const resolvedReceiptLabel =
+                  receiptLabel ||
+                  (resolvedReceiptStatus === 'read'
+                    ? 'Read'
+                    : resolvedReceiptStatus === 'delivered'
+                    ? 'Delivered'
+                    : 'Sent');
+
+                return (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onInfo) onInfo(message);
+                    }}
+                    title={resolvedReceiptLabel}
+                    aria-label={resolvedReceiptLabel}
+                    data-receipt-status={resolvedReceiptStatus}
+                    className="inline-flex items-center ml-0.5 rounded focus:outline-none hover:opacity-90 transition-opacity"
+                  >
+                    {resolvedReceiptStatus === 'read' ? (
+                      <CheckCheck
+                        className="h-3.5 w-3.5 text-[#53bdeb] drop-shadow-[0_0_2px_rgba(83,189,235,0.28)]"
+                        strokeWidth={2.4}
+                      />
+                    ) : resolvedReceiptStatus === 'delivered' ? (
+                      <CheckCheck className="h-3.5 w-3.5 text-[#8696a0]" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5 text-[#8696a0]" />
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           </div>
 

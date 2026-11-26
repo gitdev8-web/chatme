@@ -34,6 +34,8 @@ export interface LastMessageInfo {
   senderName: string;
   timestamp: string;
   type: 'text' | 'image' | 'file' | 'voice' | 'poll' | 'location' | 'contact' | 'system';
+  readBy?: string[];
+  deliveredTo?: string[];
 }
 
 export interface PinnedMessageInfo {
@@ -194,8 +196,8 @@ export interface CallSession {
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
-  offer?: { type: string; sdp: string };
-  answer?: { type: string; sdp: string };
+  offer?: { type: string; sdp: string; by?: 'caller' | 'receiver' };
+  answer?: { type: string; sdp: string; by?: 'caller' | 'receiver' };
   callerIce?: string[];
   receiverIce?: string[];
 }

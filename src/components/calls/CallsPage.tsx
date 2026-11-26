@@ -284,13 +284,13 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
                         type="button"
                         onClick={() =>
                           handlePlaceCall(contact.uid, contact.displayName, contact.photoURL, 'audio')
                         }
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#202c33] text-[#00a884] hover:bg-[#00a884] hover:text-[#0b141a] transition"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#202c33] text-[#00a884] hover:bg-[#00a884] hover:text-[#0b141a] transition"
                         title="Voice Call"
                         aria-label={`Voice call ${contact.displayName}`}
                       >
@@ -301,7 +301,7 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                         onClick={() =>
                           handlePlaceCall(contact.uid, contact.displayName, contact.photoURL, 'video')
                         }
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#202c33] text-[#53bdeb] hover:bg-[#53bdeb] hover:text-[#0b141a] transition"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#202c33] text-[#53bdeb] hover:bg-[#53bdeb] hover:text-[#0b141a] transition"
                         title="Video Call"
                         aria-label={`Video call ${contact.displayName}`}
                       >
@@ -373,9 +373,17 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                             <PhoneIncoming className="h-3.5 w-3.5 text-[#53bdeb] flex-shrink-0" />
                           )}
                           <span>
-                            {isMissed ? 'Missed' : isOutgoing ? 'Outgoing' : 'Incoming'}
+                            {isMissed
+                              ? 'Missed'
+                              : isOutgoing && call.status === 'missed'
+                              ? 'No Answer'
+                              : isOutgoing && call.status === 'rejected'
+                              ? 'Declined'
+                              : isOutgoing
+                              ? 'Outgoing'
+                              : 'Incoming'}
                           </span>
-                          <span>•</span>
+                          <span>·</span>
                           <span>
                             {new Date(call.createdAt).toLocaleString([], {
                               month: 'short',
@@ -386,7 +394,7 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                           </span>
                           {dur && (
                             <>
-                              <span>•</span>
+                              <span>·</span>
                               <span className="font-mono text-[#00a884]">{dur}</span>
                             </>
                           )}
@@ -400,7 +408,7 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                         onClick={() =>
                           handlePlaceCall(peerId, peerName, peerPhoto, call.callType)
                         }
-                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#202c33] text-[#00a884] hover:bg-[#00a884] hover:text-[#0b141a] transition"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#202c33] text-[#00a884] hover:bg-[#00a884] hover:text-[#0b141a] transition"
                         title={`Call back (${call.callType})`}
                         aria-label={`Call back ${peerName}`}
                       >

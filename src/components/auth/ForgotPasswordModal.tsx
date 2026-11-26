@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Mail, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
@@ -27,10 +27,18 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setEmail(defaultEmail);
+      setSent(false);
+      setError(null);
+    }
+  }, [isOpen, defaultEmail]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError('Please provide your registered email address.');
+      setError('Please enter your registered email address.');
       return;
     }
     setError(null);
@@ -38,10 +46,16 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     try {
       await resetPassword(email.trim());
       setSent(true);
-      showToast('Reset link sent to your email!', 'success');
+      showToast('Password reset link sent', 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send password reset email';
-      setError(msg);
+      if (msg.includes('auth/invalid-email')) {
+        setError('Please enter a valid email address.');
+      } else if (msg.includes('auth/user-not-found')) {
+        setError('No account was found with that email address.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -57,16 +71,18 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     >
       {sent ? (
         <div className="text-center py-4 space-y-3">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#00a884]/15 text-[#00a884]">
             <CheckCircle2 className="h-6 w-6" />
           </div>
-          <h4 className="text-sm font-semibold text-slate-200">Email Dispatched</h4>
-          <p className="text-xs text-slate-400">
-            We sent instructions to <strong className="text-slate-200">{email}</strong>. Check your inbox (or spam) to set a new password.
+          <h4 className="text-sm font-semibold text-[#e9edef]">Check your inbox</h4>
+          <p className="text-xs text-[#8696a0] leading-relaxed">
+            We sent password reset instructions to{' '}
+            <strong className="text-[#e9edef]">{email}</strong>.
           </p>
           <button
+            type="button"
             onClick={onClose}
-            className="mt-4 w-full rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
+            className="mt-2 w-full min-h-[44px] rounded-xl bg-[#202c33] py-2.5 text-xs font-semibold text-[#e9edef] hover:bg-[#2a3942] transition"
           >
             Back to Sign In
           </button>
@@ -74,21 +90,26 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-300">
-              {error}
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-rose-400" />
+              <span>{error}</span>
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-300">Email Address</label>
+            <label htmlFor="reset-email" className="text-xs font-medium text-[#8696a0] block">
+              Email Address
+            </label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
               <input
+                id="reset-email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@domain.com"
-                className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                placeholder="name@example.com"
+                autoComplete="email"
+                className="w-full min-h-[44px] rounded-xl border border-[#222d34] bg-[#202c33] pl-10 pr-4 py-2.5 text-[15px] sm:text-sm text-[#e9edef] placeholder:text-[#8696a0]/70 focus:border-[#00a884] focus:outline-none focus:ring-1 focus:ring-[#00a884] transition"
               />
             </div>
           </div>
@@ -96,10 +117,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 text-xs font-semibold text-[#111b21] shadow-md hover:bg-[#06cf9c] disabled:opacity-50 transition cursor-pointer"
+            className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 text-sm font-semibold text-[#0b141a] shadow-md hover:bg-[#06cf9c] disabled:opacity-50 transition cursor-pointer"
           >
-            {loading ? 'Sending link...' : 'Send Reset Link'}
-            <ArrowRight className="h-3.5 w-3.5" />
+            <span>{loading ? 'Sending link...' : 'Send Reset Link'}</span>
+            {!loading && <ArrowRight className="h-4 w-4" />}
           </button>
         </form>
       )}

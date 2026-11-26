@@ -332,7 +332,7 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
 
       {/* Real-time Incoming Call Modal */}
       <IncomingCallModal
-        call={incomingCall}
+        call={activeCallSession ? null : incomingCall}
         onAccept={(call) => {
           setIncomingCall(null);
           setActiveCallSession(call);

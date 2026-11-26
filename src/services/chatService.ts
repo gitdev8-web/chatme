@@ -264,6 +264,8 @@ export async function sendMessage(
               senderName: senderName || 'User',
               timestamp: now,
               type,
+              readBy: [senderId],
+              deliveredTo: [senderId],
             },
             unreadCounts: newUnread,
           },
@@ -397,7 +399,8 @@ export async function toggleMessageReaction(
 export async function markConversationAsRead(
   conversationId: string,
   currentUid: string,
-  unreadMessageIds?: string[]
+  unreadMessageIds?: string[],
+  lastMessageId?: string
 ): Promise<void> {
   try {
     const convRef = doc(db, 'conversations', conversationId);
@@ -412,13 +415,25 @@ export async function markConversationAsRead(
     );
 
     if (unreadMessageIds && unreadMessageIds.length > 0) {
-      const updates = unreadMessageIds.slice(0, 30).map((msgId) => {
+      // Prioritize the most recent unread messages so active viewport messages update immediately
+      const targetIds = unreadMessageIds.slice(-100);
+      const updates = targetIds.map((msgId) => {
         const msgRef = doc(db, 'conversations', conversationId, 'messages', msgId);
         return updateDoc(msgRef, {
           readBy: arrayUnion(currentUid),
           deliveredTo: arrayUnion(currentUid),
         }).catch(() => {});
       });
+
+      if (lastMessageId && targetIds.includes(lastMessageId)) {
+        updates.push(
+          updateDoc(convRef, {
+            'lastMessage.readBy': arrayUnion(currentUid),
+            'lastMessage.deliveredTo': arrayUnion(currentUid),
+          }).catch(() => {})
+        );
+      }
+
       await Promise.allSettled(updates);
     }
   } catch {
@@ -429,16 +444,28 @@ export async function markConversationAsRead(
 export async function markMessagesAsDelivered(
   conversationId: string,
   currentUid: string,
-  messageIds: string[]
+  messageIds: string[],
+  lastMessageId?: string
 ): Promise<void> {
   if (!messageIds || messageIds.length === 0) return;
   try {
-    const updates = messageIds.slice(0, 20).map((msgId) => {
+    const targetIds = messageIds.slice(-60);
+    const updates = targetIds.map((msgId) => {
       const msgRef = doc(db, 'conversations', conversationId, 'messages', msgId);
       return updateDoc(msgRef, {
         deliveredTo: arrayUnion(currentUid),
       }).catch(() => {});
     });
+
+    if (lastMessageId && targetIds.includes(lastMessageId)) {
+      const convRef = doc(db, 'conversations', conversationId);
+      updates.push(
+        updateDoc(convRef, {
+          'lastMessage.deliveredTo': arrayUnion(currentUid),
+        }).catch(() => {})
+      );
+    }
+
     await Promise.allSettled(updates);
   } catch {
     // Non-critical

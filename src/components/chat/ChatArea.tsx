@@ -88,6 +88,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     startDirectChat,
     setReplyingTo,
     setActiveConversationId,
+    markActiveConversationRead,
   } = useChat();
 
   const [searchInChat, setSearchInChat] = useState(false);
@@ -152,6 +153,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   ).length;
   const [isHeaderStatusViewerOpen, setIsHeaderStatusViewerOpen] = useState(false);
 
+  const recipientIds = useMemo(() => {
+    const participants = activeConversation?.participantIds || [];
+    if (participants.length > 0) {
+      return participants.filter((id) => id !== user?.uid);
+    }
+    return partnerId ? [partnerId] : [];
+  }, [activeConversation?.participantIds, partnerId, user?.uid]);
+
   const scrollToAndHighlightMessage = (messageId: string) => {
     const el = document.getElementById(`msg_${messageId}`);
     if (!el) return;
@@ -205,13 +214,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setSearchInChat(false);
     setChatSearchTerm('');
     scrollToBottom(false);
-  }, [activeConversation?.id]);
+    markActiveConversationRead();
+  }, [activeConversation?.id, markActiveConversationRead]);
 
   useEffect(() => {
     if (!showScrollBottom && !chatSearchTerm.trim()) {
       scrollToBottom(true);
     }
-  }, [(messages || []).length]);
+    if ((messages || []).some((m) => m.senderId !== user?.uid && !m.readBy?.includes(user?.uid || ''))) {
+      markActiveConversationRead();
+    }
+  }, [(messages || []).length, markActiveConversationRead]);
 
   useEffect(() => {
     const unsub = subscribeToWallpaperChange((nextId) => setWallpaperId(nextId));
@@ -421,6 +434,52 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const unreadInActive = activeConversation.unreadCounts?.[user?.uid || ''] || 0;
   const activeMatchId = matchingMessageIds[matchCursor];
+
+  const getMessageReceiptInfo = (
+    msg: Message
+  ): { status: 'sent' | 'delivered' | 'read'; label: string } => {
+    const targetRecipients =
+      recipientIds.length > 0
+        ? recipientIds
+        : (msg.readBy || []).filter((uid) => uid !== msg.senderId);
+
+    const readRecipients = (msg.readBy || []).filter(
+      (uid) => uid !== msg.senderId && (recipientIds.length === 0 || recipientIds.includes(uid))
+    );
+    const deliveredRecipients = (msg.deliveredTo || []).filter(
+      (uid) => uid !== msg.senderId && (recipientIds.length === 0 || recipientIds.includes(uid))
+    );
+
+    const isRead = isDirect
+      ? readRecipients.length > 0
+      : targetRecipients.length > 0
+      ? targetRecipients.every((uid) => readRecipients.includes(uid))
+      : readRecipients.length > 0;
+
+    if (isRead) {
+      const readerNames = readRecipients
+        .map((uid) => userCache[uid]?.displayName)
+        .filter(Boolean);
+      const label =
+        isDirect && readerNames.length > 0
+          ? `Read by ${readerNames[0]}`
+          : !isDirect && readRecipients.length > 0
+          ? `Read by all (${readRecipients.length})`
+          : 'Read';
+      return { status: 'read', label };
+    }
+
+    const isDelivered = deliveredRecipients.length > 0 || readRecipients.length > 0;
+    if (isDelivered) {
+      const label =
+        !isDirect && readRecipients.length > 0
+          ? `Read by ${readRecipients.length} of ${targetRecipients.length}`
+          : 'Delivered';
+      return { status: 'delivered', label };
+    }
+
+    return { status: 'sent', label: 'Sent' };
+  };
 
   return (
     <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
@@ -746,6 +805,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 new Date(prevMsg.createdAt).toDateString();
             const isMatch = matchingMessageIds.includes(msg.id);
             const isCurrentMatch = activeMatchId === msg.id;
+            const isOutgoing = msg.senderId === user?.uid;
+            const receiptInfo = isOutgoing ? getMessageReceiptInfo(msg) : undefined;
 
             return (
               <React.Fragment key={msg.id}>
@@ -758,13 +819,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
                 <MessageBubble
                   message={msg}
-                  isSelf={msg.senderId === user?.uid}
+                  isSelf={isOutgoing}
                   isGroup={activeConversation.type === 'group'}
                   isPinned={activeConversation.pinnedMessage?.messageId === msg.id}
                   currentUserId={user?.uid || ''}
                   userCache={userCache}
                   isSearchMatch={isMatch}
                   isCurrentSearchMatch={isCurrentMatch}
+                  receiptStatus={receiptInfo?.status}
+                  receiptLabel={receiptInfo?.label}
                   onReply={(m) => setReplyingTo(m)}
                   onEdit={(m) => {
                     setEditingMessage(m);
