@@ -9,7 +9,18 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase, Database } from 'firebase/database';
 import { getAnalytics, isSupported } from 'firebase/analytics';
-import defaultFirebaseConfig from '../../firebase-applet-config.json';
+
+const defaultFirebaseConfig = {
+  apiKey: 'AIzaSyARiXf6XajidKdHp1ei-iJFO8pOi1Vkhzg',
+  authDomain: 'devchat-2e73d.firebaseapp.com',
+  databaseURL: 'https://devchat-2e73d-default-rtdb.firebaseio.com',
+  projectId: 'devchat-2e73d',
+  storageBucket: 'devchat-2e73d.firebasestorage.app',
+  messagingSenderId: '450855347917',
+  appId: '1:450855347917:web:ae43274b874ce98116ab84',
+  measurementId: 'G-34FJGSPXK3',
+  firestoreDatabaseId: '(default)',
+};
 
 // Support both packaged config and optional environment variables
 const resolvedConfig = {
@@ -18,10 +29,9 @@ const resolvedConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaultFirebaseConfig.apiKey,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultFirebaseConfig.authDomain,
   databaseURL:
-    import.meta.env.VITE_FIREBASE_DATABASE_URL ||
-    `https://${defaultFirebaseConfig.projectId}-default-rtdb.firebaseio.com`,
+    import.meta.env.VITE_FIREBASE_DATABASE_URL || defaultFirebaseConfig.databaseURL,
   firestoreDatabaseId:
-    import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultFirebaseConfig as any).firestoreDatabaseId || '(default)',
+    import.meta.env.VITE_FIREBASE_DATABASE_ID || defaultFirebaseConfig.firestoreDatabaseId || '(default)',
   storageBucket:
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaultFirebaseConfig.storageBucket,
   messagingSenderId:
