@@ -302,6 +302,34 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     const unsubPresence = subscribeToAllPresence((presenceMap) => {
+      const currentCache = userCacheRef.current;
+      const newlyOnlineProfiles: UserProfile[] = [];
+
+      Object.keys(presenceMap).forEach((uid) => {
+        const existing = currentCache[uid];
+        if (!existing) return;
+        const p = presenceMap[uid];
+        const pTime =
+          typeof p.lastSeen === 'number'
+            ? new Date(p.lastSeen).toISOString()
+            : p.lastSeen;
+        if (existing.isOnline !== p.isOnline || existing.lastSeen !== pTime) {
+          const updatedProfile: UserProfile = {
+            ...existing,
+            isOnline: p.isOnline,
+            lastSeen: pTime,
+          };
+          if (uid !== user.uid && initialUsersLoadedRef.current) {
+            const nowOnline = isUserOnline(updatedProfile);
+            const wasOnline = prevOnlineMapRef.current[uid];
+            if (wasOnline !== true && nowOnline) {
+              newlyOnlineProfiles.push(updatedProfile);
+            }
+            prevOnlineMapRef.current[uid] = nowOnline;
+          }
+        }
+      });
+
       setUserCache((prev) => {
         let changed = false;
         const next = { ...prev };
@@ -313,26 +341,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ? new Date(p.lastSeen).toISOString()
                 : p.lastSeen;
             if (next[uid].isOnline !== p.isOnline || next[uid].lastSeen !== pTime) {
-              const updatedProfile: UserProfile = {
+              next[uid] = {
                 ...next[uid],
                 isOnline: p.isOnline,
                 lastSeen: pTime,
               };
-              next[uid] = updatedProfile;
               changed = true;
-
-              if (uid !== user.uid && initialUsersLoadedRef.current) {
-                const nowOnline = isUserOnline(updatedProfile);
-                const wasOnline = prevOnlineMapRef.current[uid];
-                if (wasOnline !== true && nowOnline) {
-                  notifyUserCameOnline(updatedProfile);
-                }
-                prevOnlineMapRef.current[uid] = nowOnline;
-              }
             }
           }
         });
         return changed ? next : prev;
+      });
+
+      newlyOnlineProfiles.forEach((uProfile) => {
+        notifyUserCameOnline(uProfile);
       });
     });
 
