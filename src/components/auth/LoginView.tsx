@@ -7,36 +7,19 @@ import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Shield } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
-import { GoogleSignInButton } from './GoogleSignInButton';
 
 interface LoginViewProps {
   onSwitchToRegister: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
-  const { loginWithEmail, loginWithGoogle } = useAuth();
+  const { loginWithEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setGoogleLoading(true);
-    try {
-      await loginWithGoogle();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Google sign-in failed';
-      if (!msg.includes('auth/popup-closed-by-user')) {
-        setError(msg);
-      }
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,25 +151,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
 
             <button
               type="submit"
-              disabled={loading || googleLoading}
+              disabled={loading}
               className="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-[#00a884] py-2.5 px-4 text-sm font-semibold text-[#0b141a] shadow-md hover:bg-[#06cf9c] active:scale-[0.99] transition disabled:opacity-50 mt-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]"
             >
               <span>{loading ? 'Signing in...' : 'Sign In'}</span>
               {!loading && <ArrowRight className="h-4 w-4" />}
             </button>
           </form>
-
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-[#222d34]" />
-            <span className="text-[11px] font-medium uppercase tracking-wider text-[#8696a0]">or</span>
-            <div className="h-px flex-1 bg-[#222d34]" />
-          </div>
-
-          <GoogleSignInButton
-            onClick={handleGoogleSignIn}
-            loading={googleLoading}
-            disabled={loading}
-          />
 
           <div className="mt-5 pt-4 border-t border-[#222d34]/80 text-center text-xs text-[#8696a0]">
             New to DEV CHAT?{' '}
