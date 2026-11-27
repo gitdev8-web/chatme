@@ -26,6 +26,9 @@ import {
   MessageSquare,
   Timer,
   BarChart3,
+  Video,
+  Film,
+  Maximize2,
   X,
 } from 'lucide-react';
 import { Message, UserProfile } from '../../types';
@@ -57,7 +60,7 @@ interface MessageBubbleProps {
   onVotePoll?: (messageId: string, optionId: string) => void;
   onOpenViewOnce?: (msg: Message) => void;
   onMessageContact?: (uid: string) => void;
-  onOpenMedia: (url: string, name?: string) => void;
+  onOpenMedia: (url: string, name?: string, mediaType?: 'image' | 'video') => void;
   onScrollToMessage?: (messageId: string) => void;
   onForward?: (msg: Message) => void;
   onReport?: (msg: Message) => void;
@@ -129,6 +132,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const handleCopy = () => {
     const copyContent =
+      (message.type === 'meet' && message.meet?.meetingUri) ||
       message.text ||
       (message.location
         ? `${message.location.label || 'Location'} (${message.location.latitude}, ${message.location.longitude})`
@@ -567,15 +571,47 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       <img
                         src={message.fileUrl}
                         alt={message.fileName || 'Attachment'}
-                        onClick={() => onOpenMedia(message.fileUrl!, message.fileName)}
+                        onClick={() => onOpenMedia(message.fileUrl!, message.fileName, 'image')}
                         className="max-h-72 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                         loading="lazy"
                       />
                       {message.text && (
-                        <p className="mt-1.5 text-[13px] text-[#e9edef]">{message.text}</p>
+                        <div className="mt-1.5 text-[13px] text-[#e9edef] pr-4">
+                          <RenderMessage3DEmojis text={message.text} />
+                        </div>
                       )}
                     </div>
                   )
+                )}
+
+                {/* Video Attachment */}
+                {message.type === 'video' && message.fileUrl && (
+                  <div className="mb-1 overflow-hidden rounded-lg">
+                    <div className="relative bg-black rounded-lg overflow-hidden">
+                      <video
+                        src={message.fileUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="max-h-72 w-full rounded-lg bg-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => onOpenMedia(message.fileUrl!, message.fileName || 'Video', 'video')}
+                        title="Open video fullscreen"
+                        aria-label="Open video fullscreen"
+                        className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white hover:bg-black/80 transition"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {message.text && (
+                      <div className="mt-1.5 flex items-start gap-1.5 text-[13px] text-[#e9edef] pr-4">
+                        <Film className="h-3.5 w-3.5 text-[#25d366] flex-shrink-0 mt-1" />
+                        <RenderMessage3DEmojis text={message.text} />
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Document / File Attachment */}
@@ -765,6 +801,56 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         <span>Message</span>
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Google Meet Video Invite Card */}
+                {message.type === 'meet' && message.meet && (
+                  <div className="min-w-[230px] sm:min-w-[265px] overflow-hidden rounded-xl border border-white/10 bg-black/25 mt-0.5">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-[#0d3b31] via-[#112a36] to-[#0b141a] p-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#00a884]/20 text-[#25d366] ring-1 ring-[#25d366]/40">
+                        <Video className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1 pr-3">
+                        <p className="text-xs font-bold text-[#e9edef] truncate">
+                          Google Meet Video Call
+                        </p>
+                        <p className="text-[11px] text-white/70 truncate">
+                          {message.meet.hostName
+                            ? `Hosted by ${message.meet.hostName}`
+                            : 'Video session'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-2.5 space-y-2">
+                      <div className="flex items-center justify-between gap-2 rounded-lg bg-black/25 px-2.5 py-1.5 text-[11px]">
+                        <span className="text-white/60">Code</span>
+                        <span className="font-mono font-semibold text-[#25d366] truncate">
+                          {message.meet.meetingCode}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={message.meet.meetingUri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 min-h-[36px] flex items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 py-1.5 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span>Join Meet</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(message.meet!.meetingUri);
+                            showToast('Google Meet link copied', 'success');
+                          }}
+                          className="min-h-[36px] rounded-lg bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-white/20 transition"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 

@@ -85,6 +85,33 @@ export function buildMeetGoogleProvider(): GoogleAuthProvider {
   return provider;
 }
 
+function mapMeetAuthError(err: unknown): Error {
+  const code = (err as { code?: string })?.code || '';
+  if (code === 'auth/operation-not-allowed') {
+    return new Error(
+      'Google Sign-In is disabled in Firebase Authentication for this project. Enable the Google provider in Firebase Console > Authentication > Sign-in method to authorize Google Meet.'
+    );
+  }
+  if (code === 'auth/unauthorized-domain') {
+    return new Error(
+      'This app domain is not authorized in Firebase Authentication. Add this domain under Firebase Console > Authentication > Settings > Authorized domains.'
+    );
+  }
+  if (code === 'auth/popup-blocked') {
+    return new Error(
+      'Popup was blocked by your browser. Please allow popups for this site and try again.'
+    );
+  }
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    return new Error('Google authorization popup was closed before completing.');
+  }
+  if (code === 'auth/user-mismatch') {
+    return new Error('Please choose the same Google account linked to your profile.');
+  }
+  if (err instanceof Error) return err;
+  return new Error('Could not authorize Google Meet access.');
+}
+
 /**
  * Authenticates or re-authorizes the user with Google and requests Google Meet scopes.
  * Preserves existing email/password accounts via linkWithPopup when possible.
@@ -94,13 +121,17 @@ export async function authorizeGoogleMeet(): Promise<string> {
   const currentUser = auth.currentUser;
 
   if (!currentUser) {
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Could not obtain Google Meet access permission. Please try again.');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.accessToken) {
+        throw new Error('Could not obtain Google Meet access permission. Please try again.');
+      }
+      setMeetAccessToken(credential.accessToken);
+      return credential.accessToken;
+    } catch (err) {
+      throw mapMeetAuthError(err);
     }
-    setMeetAccessToken(credential.accessToken);
-    return credential.accessToken;
   }
 
   const hasGoogleProvider = currentUser.providerData.some(
@@ -108,16 +139,27 @@ export async function authorizeGoogleMeet(): Promise<string> {
   );
 
   if (hasGoogleProvider) {
-    const result = await reauthenticateWithPopup(currentUser, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Google Meet permission was not granted. Please try again.');
+    try {
+      const result = await reauthenticateWithPopup(currentUser, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.accessToken) {
+        throw new Error('Google Meet permission was not granted. Please try again.');
+      }
+      setMeetAccessToken(credential.accessToken);
+      return credential.accessToken;
+    } catch (err) {
+      const errCred = GoogleAuthProvider.credentialFromError(
+        err as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]
+      );
+      if (errCred?.accessToken) {
+        setMeetAccessToken(errCred.accessToken);
+        return errCred.accessToken;
+      }
+      throw mapMeetAuthError(err);
     }
-    setMeetAccessToken(credential.accessToken);
-    return credential.accessToken;
   }
 
-  // User signed in with email/password or anonymous: try linking first to preserve UID
+  // User signed in with email/password or anonymous: link popup to preserve active UID
   try {
     const result = await linkWithPopup(currentUser, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -136,21 +178,27 @@ export async function authorizeGoogleMeet(): Promise<string> {
       return errCred.accessToken;
     }
 
-    if (
-      code === 'auth/credential-already-in-use' ||
-      code === 'auth/email-already-in-use' ||
-      code === 'auth/provider-already-linked'
-    ) {
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential?.accessToken) {
-        throw new Error('Google Meet permission was not granted.');
+    if (code === 'auth/provider-already-linked') {
+      try {
+        const result = await reauthenticateWithPopup(currentUser, provider);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (!credential?.accessToken) {
+          throw new Error('Google Meet permission was not granted.');
+        }
+        setMeetAccessToken(credential.accessToken);
+        return credential.accessToken;
+      } catch (reauthErr) {
+        throw mapMeetAuthError(reauthErr);
       }
-      setMeetAccessToken(credential.accessToken);
-      return credential.accessToken;
     }
 
-    throw err;
+    if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use') {
+      throw new Error(
+        'That Google account is already linked to another DEV CHAT account. Please choose another Google account to authorize Google Meet.'
+      );
+    }
+
+    throw mapMeetAuthError(err);
   }
 }
 

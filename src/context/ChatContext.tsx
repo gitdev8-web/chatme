@@ -149,6 +149,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     readReceiptsEnabledRef.current = profile?.readReceipts !== false;
     profileRef.current = profile;
+    if (profile?.uid) {
+      setUserCache((prev) => ({ ...prev, [profile.uid]: profile }));
+    }
   }, [profile]);
 
   useEffect(() => {
@@ -819,6 +822,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     } catch (err) {
       console.warn('Notice sending media message:', err);
+      throw err;
     } finally {
       setTimeout(() => setUploadProgress(null), 500);
     }
@@ -944,11 +948,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let snippet = msg.text || '';
     if (!snippet) {
       if (msg.type === 'image') snippet = '📷 Photo';
+      else if (msg.type === 'video') snippet = '🎬 Video';
       else if (msg.type === 'voice') snippet = '🎤 Voice message';
       else if (msg.type === 'file') snippet = `📎 ${msg.fileName || 'Document'}`;
       else if (msg.type === 'poll') snippet = `📊 ${msg.poll?.question || 'Poll'}`;
       else if (msg.type === 'location') snippet = '📍 Location';
       else if (msg.type === 'contact') snippet = `👤 ${msg.contactCard?.displayName || 'Contact'}`;
+      else if (msg.type === 'meet') snippet = `📹 Google Meet (${msg.meet?.meetingCode || 'Video Call'})`;
     }
     await pinMessageInConversation(activeConversationId, {
       messageId: msg.id,

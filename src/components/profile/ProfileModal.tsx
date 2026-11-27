@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
-import { Camera, AtSign, User, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Camera, AtSign, User, AlertCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
 import { Avatar } from '../common/Avatar';
 import { Modal } from '../common/Modal';
 import { uploadFileWithProgress } from '../../services/storageService';
-import { compressImage } from '../../utils/imageUtils';
+import { compressAvatarImage } from '../../utils/imageUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -37,12 +37,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [photoURL, setPhotoURL] = useState(profile?.photoURL || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [photoRemoved, setPhotoRemoved] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync fields cleanly whenever modal opens or profile updates
+  // Sync fields cleanly whenever modal opens
   useEffect(() => {
     if (isOpen && profile) {
       setDisplayName(profile.displayName || '');
@@ -52,10 +54,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       setPhotoURL(profile.photoURL || '');
       setAvatarFile(null);
       setAvatarPreview('');
+      setPhotoRemoved(false);
       setError(null);
       setUsernameStatus('idle');
     }
-  }, [isOpen, profile]);
+  }, [isOpen, profile?.uid]);
 
   const handleUsernameChange = async (val: string) => {
     const cleaned = val.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 30);
@@ -81,17 +84,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   };
 
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      try {
-        const compressed = await compressImage(file, 512, 0.85);
-        setAvatarFile(compressed.file);
-        setAvatarPreview(compressed.dataUrl);
-      } catch {
-        setAvatarFile(file);
-        setAvatarPreview(URL.createObjectURL(file));
-      }
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file (PNG, JPG, WebP).');
+      return;
     }
+
+    setError(null);
+    try {
+      const compressed = await compressAvatarImage(file);
+      setAvatarFile(compressed.file);
+      setAvatarPreview(compressed.dataUrl);
+      setPhotoRemoved(false);
+    } catch {
+      setError('Could not process selected image. Please try another photo.');
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setAvatarFile(null);
+    setAvatarPreview('');
+    setPhotoURL('');
+    setPhotoRemoved(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -110,14 +127,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     setSaving(true);
 
     try {
-      let finalPhotoURL = photoURL;
+      let finalPhotoURL = photoRemoved ? '' : photoURL;
       if (avatarFile && user) {
-        const uploadRes = await uploadFileWithProgress(
-          avatarFile,
-          'avatars',
-          `avatar_${user.uid}.jpg`
-        );
-        finalPhotoURL = uploadRes.url;
+        try {
+          const uploadRes = await uploadFileWithProgress(
+            avatarFile,
+            `avatars/${user.uid}`,
+            `avatar_${user.uid}_${Date.now()}.jpg`
+          );
+          finalPhotoURL = uploadRes.url || avatarPreview || finalPhotoURL;
+        } catch {
+          if (avatarPreview && avatarPreview.length <= 220_000) {
+            finalPhotoURL = avatarPreview;
+          } else {
+            throw new Error('Could not upload profile photo. Please try a smaller image.');
+          }
+        }
       }
 
       await updateProfileData({
@@ -138,6 +163,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   };
 
+  const displayedPhoto = photoRemoved ? '' : avatarPreview || photoURL;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -155,23 +182,47 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         )}
 
         <div className="flex flex-col items-center justify-center">
-          <div className="relative group cursor-pointer">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="relative group cursor-pointer"
+          >
             <Avatar
-              src={avatarPreview || photoURL}
+              src={displayedPhoto}
               name={displayName || 'User'}
               size="xl"
             />
-            <label className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity">
               <Camera className="h-5 w-5 text-white" />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarFile}
-                className="hidden"
-              />
-            </label>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFile}
+              className="hidden"
+            />
           </div>
-          <span className="text-[11px] text-[#8696a0] mt-2">Tap photo to change avatar</span>
+
+          <div className="mt-2.5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1 rounded-lg bg-[#202c33] px-2.5 py-1 text-[11px] font-medium text-[#00a884] hover:bg-[#2a3942] transition"
+            >
+              <Camera className="h-3 w-3" />
+              <span>{displayedPhoto ? 'Change photo' : 'Upload photo'}</span>
+            </button>
+            {displayedPhoto && (
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                className="inline-flex items-center gap-1 rounded-lg bg-[#202c33] px-2.5 py-1 text-[11px] font-medium text-rose-400 hover:bg-[#2a3942] transition"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Remove</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

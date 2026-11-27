@@ -33,7 +33,7 @@ export interface LastMessageInfo {
   senderId: string;
   senderName: string;
   timestamp: string;
-  type: 'text' | 'image' | 'file' | 'voice' | 'poll' | 'location' | 'contact' | 'meet' | 'system';
+  type: 'text' | 'image' | 'video' | 'file' | 'voice' | 'poll' | 'location' | 'contact' | 'meet' | 'system';
   readBy?: string[];
   deliveredTo?: string[];
 }
@@ -72,6 +72,7 @@ export interface Conversation {
 export type MessageType =
   | 'text'
   | 'image'
+  | 'video'
   | 'file'
   | 'voice'
   | 'poll'

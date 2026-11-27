@@ -16,6 +16,7 @@ import {
   UserPlus,
   X,
   Clock,
+  ExternalLink,
 } from 'lucide-react';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -29,6 +30,7 @@ import {
 } from '../../services/callService';
 import { Avatar } from '../common/Avatar';
 import { CallModal } from './CallModal';
+import { GoogleMeetModal } from './GoogleMeetModal';
 import { useToast } from '../common/Toast';
 import { isUserOnline } from '../../utils/presenceUtils';
 
@@ -60,6 +62,11 @@ export const CallsPage: React.FC<CallsPageProps> = ({
     contactName: string;
     contactPhoto?: string;
     callType: 'audio' | 'video';
+  } | null>(null);
+  const [activeMeetCall, setActiveMeetCall] = useState<{
+    targetUid?: string;
+    contactName: string;
+    contactPhoto?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -104,8 +111,16 @@ export const CallsPage: React.FC<CallsPageProps> = ({
       showToast('Voice calls are currently disabled by administrator', 'warning');
       return;
     }
-    if (type === 'video' && !videoCallsEnabled) {
-      showToast('Video calls are currently disabled by administrator', 'warning');
+    if (type === 'video') {
+      if (!videoCallsEnabled) {
+        showToast('Video calls are currently disabled by administrator', 'warning');
+        return;
+      }
+      setActiveMeetCall({
+        targetUid,
+        contactName: targetName,
+        contactPhoto: targetPhoto,
+      });
       return;
     }
     try {
@@ -126,6 +141,17 @@ export const CallsPage: React.FC<CallsPageProps> = ({
     } catch {
       showToast('Could not initiate call', 'error');
     }
+  };
+
+  const handleInstantMeet = () => {
+    if (!videoCallsEnabled) {
+      showToast('Video calls are currently disabled by administrator', 'warning');
+      return;
+    }
+    setActiveMeetCall({
+      contactName: 'Instant Google Meet',
+      contactPhoto: profile?.photoURL || user?.photoURL || undefined,
+    });
   };
 
   const filteredHistory = useMemo(() => {
@@ -189,16 +215,28 @@ export const CallsPage: React.FC<CallsPageProps> = ({
           </div>
         </div>
 
-        {onOpenContacts && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onOpenContacts}
-            className="flex min-h-[40px] items-center gap-1.5 rounded-xl bg-[#00a884] px-3.5 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-md"
+            onClick={handleInstantMeet}
+            disabled={!videoCallsEnabled}
+            className="flex min-h-[40px] items-center gap-1.5 rounded-xl bg-[#25d366]/15 border border-[#25d366]/35 px-3 py-2 text-xs font-bold text-[#25d366] hover:bg-[#00a884] hover:text-[#0b141a] transition disabled:opacity-50"
           >
-            <UserPlus className="h-4 w-4" />
-            <span>Contacts</span>
+            <Video className="h-4 w-4" />
+            <span>New Meet</span>
           </button>
-        )}
+
+          {onOpenContacts && (
+            <button
+              type="button"
+              onClick={onOpenContacts}
+              className="flex min-h-[40px] items-center gap-1.5 rounded-xl bg-[#00a884] px-3.5 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition shadow-md"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Contacts</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
@@ -392,6 +430,12 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                               minute: '2-digit',
                             })}
                           </span>
+                          {call.provider === 'google-meet' && (
+                            <>
+                              <span>·</span>
+                              <span className="text-[#25d366] font-medium">Google Meet</span>
+                            </>
+                          )}
                           {dur && (
                             <>
                               <span>·</span>
@@ -403,6 +447,18 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {call.provider === 'google-meet' && call.meetUri && (
+                        <a
+                          href={call.meetUri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex h-11 items-center gap-1 rounded-xl bg-[#00a884]/15 border border-[#00a884]/35 px-3 text-xs font-semibold text-[#25d366] hover:bg-[#00a884] hover:text-[#0b141a] transition"
+                          title="Open Google Meet room"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Join</span>
+                        </a>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -429,7 +485,7 @@ export const CallsPage: React.FC<CallsPageProps> = ({
         {/* Footer */}
         <div className="pt-6 text-center text-xs text-[#8696a0]/70 flex items-center justify-center gap-1.5 border-t border-[#222d34]/40">
           <Sparkles className="h-3.5 w-3.5 text-[#00a884]" />
-          <span>DEV CHAT WebRTC Calls • Developed by <strong className="text-[#00a884]">lawrencedev</strong></span>
+          <span>DEV CHAT Voice & Google Meet Video Calls • Developed by <strong className="text-[#00a884]">lawrencedev</strong></span>
         </div>
       </div>
 
@@ -442,6 +498,18 @@ export const CallsPage: React.FC<CallsPageProps> = ({
           contactPhoto={activeCall.contactPhoto}
           callType={activeCall.callType}
           callSessionId={activeCall.sessionId}
+        />
+      )}
+
+      {/* Google Meet Modal */}
+      {activeMeetCall && (
+        <GoogleMeetModal
+          isOpen={true}
+          onClose={() => setActiveMeetCall(null)}
+          title={activeMeetCall.contactName}
+          photoURL={activeMeetCall.contactPhoto}
+          targetUid={activeMeetCall.targetUid}
+          targetName={activeMeetCall.targetUid ? activeMeetCall.contactName : undefined}
         />
       )}
     </div>

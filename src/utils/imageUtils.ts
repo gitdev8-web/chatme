@@ -97,3 +97,35 @@ export async function compressImage(
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Compresses an avatar image cleanly so it uploads fast and stays well under
+ * Firestore document limits (~150KB max) if inline fallback is ever needed.
+ */
+export async function compressAvatarImage(
+  file: File,
+  maxBytes = 150_000
+): Promise<CompressedImageResult> {
+  const attempts: Array<{ dim: number; quality: number }> = [
+    { dim: 420, quality: 0.84 },
+    { dim: 360, quality: 0.76 },
+    { dim: 300, quality: 0.68 },
+    { dim: 240, quality: 0.6 },
+  ];
+
+  let lastResult = await compressImage(file, attempts[0].dim, attempts[0].quality);
+  if (lastResult.dataUrl.length <= maxBytes) {
+    return lastResult;
+  }
+
+  for (let i = 1; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    lastResult = await compressImage(file, attempt.dim, attempt.quality);
+    if (lastResult.dataUrl.length <= maxBytes) {
+      return lastResult;
+    }
+  }
+
+  return lastResult;
+}
+

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   X,
   Lock,
@@ -20,7 +20,18 @@ import {
   Download,
   Eraser,
   ShieldCheck,
+  Edit2,
+  Camera,
+  Link as LinkIcon,
+  ExternalLink,
+  LogOut,
+  Film,
+  Search,
+  Check,
+  Loader2,
 } from 'lucide-react';
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { Conversation, Message, UserProfile } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { useAuth } from '../../context/AuthContext';
@@ -28,12 +39,17 @@ import { useChat } from '../../context/ChatContext';
 import { useToast } from '../common/Toast';
 import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
 import {
+  addGroupMembers,
   removeGroupMember,
+  sendGroupSystemNotice,
   toggleGroupAdmin,
   submitReport,
   toggleMuteConversation,
   updateDisappearingMessages,
+  updateGroupInfo,
 } from '../../services/chatService';
+import { uploadFileWithProgress } from '../../services/storageService';
+import { compressAvatarImage } from '../../utils/imageUtils';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { Modal } from '../common/Modal';
 import { MediaViewerModal } from './MediaViewerModal';
@@ -53,20 +69,22 @@ const DISAPPEARING_OPTIONS = [
   { label: '90 days', seconds: 7776000 },
 ];
 
+const URL_EXTRACT_REGEX = /https?:\/\/[^\s<>"'`]+/gi;
+
 export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
   conversation,
   messages,
   userCache,
   onClose,
-  onOpenAddMembers,
 }) => {
   const { user, profile, updateProfileData } = useAuth();
-  const { deleteConversation, clearConversation, starMessage } = useChat();
+  const { deleteConversation, clearConversation, starMessage, setActiveConversationId } = useChat();
   const { showToast } = useToast();
 
-  const [activeMediaTab, setActiveMediaTab] = useState<'media' | 'docs'>('media');
+  const [activeMediaTab, setActiveMediaTab] = useState<'media' | 'docs' | 'links'>('media');
   const [viewingMediaUrl, setViewingMediaUrl] = useState<string | null>(null);
   const [viewingMediaName, setViewingMediaName] = useState<string | undefined>(undefined);
+  const [viewingMediaType, setViewingMediaType] = useState<'image' | 'video' | undefined>(undefined);
 
   const [isMuted, setIsMuted] = useState(
     conversation.mutedBy?.includes(user?.uid || '') || false
@@ -83,7 +101,25 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
   const [showEncryptionModal, setShowEncryptionModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+
+  // Edit Group Info modal
+  const [showEditGroupModal, setShowEditGroupModal] = useState(false);
+  const [editGroupName, setEditGroupName] = useState(conversation.name || '');
+  const [editGroupDesc, setEditGroupDesc] = useState(conversation.description || '');
+  const [editGroupPhoto, setEditGroupPhoto] = useState(conversation.photoURL || '');
+  const [editGroupFile, setEditGroupFile] = useState<File | null>(null);
+  const [savingGroup, setSavingGroup] = useState(false);
+  const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Add Group Members modal
+  const [showAddMembersModal, setShowAddMembersModal] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([]);
+  const [selectedNewMemberIds, setSelectedNewMemberIds] = useState<string[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [addingMembers, setAddingMembers] = useState(false);
 
   const isDirect = conversation.type === 'direct';
   const partnerId = isDirect
@@ -97,11 +133,39 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
     conversation.adminIds?.includes(user?.uid || '');
 
   const mediaMessages = (messages || []).filter(
-    (m) => m.type === 'image' && m.fileUrl && !m.isDeleted
+    (m) => (m.type === 'image' || m.type === 'video') && m.fileUrl && !m.isDeleted && !m.viewOnce
   );
   const fileMessages = (messages || []).filter(
     (m) => m.type === 'file' && m.fileUrl && !m.isDeleted
   );
+  const sharedLinks = useMemo(() => {
+    const list: Array<{ id: string; url: string; senderName: string; createdAt: string }> = [];
+    (messages || []).forEach((m) => {
+      if (m.isDeleted) return;
+      if (m.type === 'meet' && m.meet?.meetingUri) {
+        list.push({
+          id: `${m.id}_meet`,
+          url: m.meet.meetingUri,
+          senderName: m.senderName,
+          createdAt: m.createdAt,
+        });
+      }
+      if (m.text) {
+        const matches = m.text.match(URL_EXTRACT_REGEX) || [];
+        matches.forEach((rawUrl, idx) => {
+          const cleanUrl = rawUrl.replace(/[),.!?:;]+$/, '');
+          list.push({
+            id: `${m.id}_${idx}`,
+            url: cleanUrl,
+            senderName: m.senderName,
+            createdAt: m.createdAt,
+          });
+        });
+      }
+    });
+    return list.reverse();
+  }, [messages]);
+
   const starredMessages = (messages || []).filter(
     (m) => m.starredBy?.includes(user?.uid || '') && !m.isDeleted
   );
@@ -179,7 +243,15 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
   };
 
   const handleRemoveMember = async (memberUid: string) => {
+    const memberName = userCache[memberUid]?.displayName || 'Member';
     await removeGroupMember(conversation.id, memberUid);
+    if (user) {
+      await sendGroupSystemNotice(
+        conversation.id,
+        user.uid,
+        `${profile?.displayName || 'Admin'} removed ${memberName}`
+      );
+    }
     showToast('Member removed from group', 'info');
   };
 
@@ -188,6 +260,149 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
     setShowDisappearingModal(false);
     showToast(`Disappearing messages set to: ${label}`, 'info');
   };
+
+  const openEditGroupModal = () => {
+    setEditGroupName(conversation.name || '');
+    setEditGroupDesc(conversation.description || '');
+    setEditGroupPhoto(conversation.photoURL || '');
+    setEditGroupFile(null);
+    setShowEditGroupModal(true);
+  };
+
+  const handleGroupPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const compressed = await compressAvatarImage(file);
+      setEditGroupFile(compressed.file);
+      setEditGroupPhoto(compressed.dataUrl);
+    } catch {
+      showToast('Could not process selected photo', 'error');
+    }
+  };
+
+  const handleSaveGroupInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editGroupName.trim()) return;
+    setSavingGroup(true);
+    try {
+      let nextPhotoUrl = editGroupPhoto;
+      if (editGroupFile) {
+        try {
+          const uploaded = await uploadFileWithProgress(
+            editGroupFile,
+            `groups/${conversation.id}`,
+            `group_${Date.now()}.jpg`
+          );
+          nextPhotoUrl = uploaded.url || editGroupPhoto;
+        } catch {
+          // Keep compressed dataUrl fallback if small enough
+        }
+      }
+
+      await updateGroupInfo(conversation.id, {
+        name: editGroupName.trim(),
+        description: editGroupDesc.trim(),
+        photoURL: nextPhotoUrl,
+      });
+
+      if (editGroupName.trim() !== conversation.name) {
+        await sendGroupSystemNotice(
+          conversation.id,
+          user.uid,
+          `${profile?.displayName || 'Admin'} changed the group name to "${editGroupName.trim()}"`
+        );
+      }
+
+      showToast('Group info updated', 'success');
+      setShowEditGroupModal(false);
+    } catch {
+      showToast('Failed to update group info', 'error');
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const openAddMembersModal = async () => {
+    setMemberSearch('');
+    setSelectedNewMemberIds([]);
+    setShowAddMembersModal(true);
+    setLoadingMembers(true);
+    try {
+      const existing = new Set(conversation.participantIds || []);
+      const snap = await getDocs(
+        query(collection(db, 'users'), orderBy('lastSeen', 'desc'), limit(100))
+      );
+      const list: UserProfile[] = [];
+      snap.forEach((docSnap) => {
+        const u = { ...(docSnap.data() as UserProfile), uid: docSnap.id };
+        if (!existing.has(u.uid) && !u.isDisabled) {
+          list.push(u);
+        }
+      });
+      setAvailableUsers(list);
+    } catch {
+      const existing = new Set(conversation.participantIds || []);
+      setAvailableUsers(
+        Object.values(userCache).filter((u) => u?.uid && !existing.has(u.uid) && !u.isDisabled)
+      );
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleAddSelectedMembers = async () => {
+    if (!user || selectedNewMemberIds.length === 0) return;
+    setAddingMembers(true);
+    try {
+      await addGroupMembers(conversation.id, selectedNewMemberIds);
+      const addedNames = selectedNewMemberIds
+        .map((id) => availableUsers.find((u) => u.uid === id)?.displayName || 'User')
+        .join(', ');
+      await sendGroupSystemNotice(
+        conversation.id,
+        user.uid,
+        `${profile?.displayName || 'Admin'} added ${addedNames}`
+      );
+      showToast(`Added ${selectedNewMemberIds.length} member(s)`, 'success');
+      setShowAddMembersModal(false);
+    } catch {
+      showToast('Failed to add members', 'error');
+    } finally {
+      setAddingMembers(false);
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!user) return;
+    setActionBusy(true);
+    try {
+      await sendGroupSystemNotice(
+        conversation.id,
+        user.uid,
+        `${profile?.displayName || 'Member'} left the group`
+      );
+      await removeGroupMember(conversation.id, user.uid);
+      showToast(`Left ${title}`, 'info');
+      setActiveConversationId(null);
+      onClose();
+    } catch {
+      showToast('Could not leave group', 'error');
+    } finally {
+      setActionBusy(false);
+      setShowLeaveConfirm(false);
+    }
+  };
+
+  const filteredCandidates = availableUsers.filter((u) => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (u.displayName || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <aside className="flex h-full w-full sm:w-80 lg:w-[360px] flex-shrink-0 flex-col border-l border-[#222d34] bg-[#111b21] select-none overflow-hidden animate-in slide-in-from-right">
@@ -217,11 +432,33 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             size="2xl"
             isOnline={isOnline}
             showPresence={isDirect}
+            onClick={
+              avatarSrc
+                ? () => {
+                    setViewingMediaUrl(avatarSrc);
+                    setViewingMediaName(title);
+                    setViewingMediaType('image');
+                  }
+                : undefined
+            }
             className="mb-4 shadow-xl ring-2 ring-[#202c33]"
           />
-          <h2 className="text-lg font-semibold text-[#e9edef] truncate max-w-full">
-            {title}
-          </h2>
+          <div className="flex items-center justify-center gap-2 max-w-full">
+            <h2 className="text-lg font-semibold text-[#e9edef] truncate">
+              {title}
+            </h2>
+            {!isDirect && isGroupAdmin && (
+              <button
+                type="button"
+                onClick={openEditGroupModal}
+                title="Edit group info"
+                aria-label="Edit group info"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[#8696a0] hover:bg-[#202c33] hover:text-[#00a884] transition"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <p className="text-xs text-[#8696a0] mt-1 font-mono">
             {isDirect
               ? partnerProfile?.phoneNumber || `@${partnerProfile?.username || 'user'}`
@@ -236,9 +473,20 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
 
         {/* About / Description */}
         <div className="bg-[#111b21] px-6 py-4 border-b border-[#222d34] space-y-1">
-          <span className="text-[11px] font-medium text-[#8696a0]">
-            {isDirect ? 'About' : 'Group Description'}
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-[#8696a0]">
+              {isDirect ? 'About' : 'Group Description'}
+            </span>
+            {!isDirect && isGroupAdmin && (
+              <button
+                type="button"
+                onClick={openEditGroupModal}
+                className="text-[11px] font-medium text-[#00a884] hover:underline"
+              >
+                Edit
+              </button>
+            )}
+          </div>
           <p className="text-xs text-[#e9edef] leading-relaxed">
             {isDirect
               ? partnerProfile?.bio || 'Hey there! I am using DEV CHAT.'
@@ -246,22 +494,22 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
           </p>
         </div>
 
-        {/* Media and Docs Tabs */}
+        {/* Media, Docs & Links Tabs */}
         <div className="bg-[#111b21] p-5 border-b border-[#222d34] space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-[#e9edef]">
-              Media & Documents
+              Media, Links & Docs
             </span>
             <span className="tabular-nums text-xs text-[#8696a0]">
-              {mediaMessages.length + fileMessages.length}
+              {mediaMessages.length + fileMessages.length + sharedLinks.length}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-[#202c33] p-1">
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-[#202c33] p-1">
             <button
               type="button"
               onClick={() => setActiveMediaTab('media')}
-              className={`rounded-lg py-1.5 text-xs font-medium transition ${
+              className={`rounded-lg py-1.5 text-[11px] font-medium transition ${
                 activeMediaTab === 'media'
                   ? 'bg-[#00a884] text-[#0b141a] font-semibold'
                   : 'text-[#8696a0] hover:text-[#e9edef]'
@@ -272,13 +520,24 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             <button
               type="button"
               onClick={() => setActiveMediaTab('docs')}
-              className={`rounded-lg py-1.5 text-xs font-medium transition ${
+              className={`rounded-lg py-1.5 text-[11px] font-medium transition ${
                 activeMediaTab === 'docs'
                   ? 'bg-[#00a884] text-[#0b141a] font-semibold'
                   : 'text-[#8696a0] hover:text-[#e9edef]'
               }`}
             >
               Docs ({fileMessages.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMediaTab('links')}
+              className={`rounded-lg py-1.5 text-[11px] font-medium transition ${
+                activeMediaTab === 'links'
+                  ? 'bg-[#00a884] text-[#0b141a] font-semibold'
+                  : 'text-[#8696a0] hover:text-[#e9edef]'
+              }`}
+            >
+              Links ({sharedLinks.length})
             </button>
           </div>
 
@@ -292,49 +551,87 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
                     onClick={() => {
                       setViewingMediaUrl(m.fileUrl!);
                       setViewingMediaName(m.fileName);
+                      setViewingMediaType(m.type === 'video' ? 'video' : 'image');
                     }}
-                    className="aspect-square overflow-hidden rounded-lg bg-[#202c33] cursor-pointer hover:opacity-85 transition ring-1 ring-white/5"
+                    className="relative aspect-square overflow-hidden rounded-lg bg-[#202c33] cursor-pointer hover:opacity-85 transition ring-1 ring-white/5"
                   >
-                    <img
-                      src={m.fileUrl}
-                      alt={m.fileName || 'Shared media'}
-                      className="h-full w-full object-cover"
-                    />
+                    {m.type === 'video' ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center bg-[#182229] text-[#25d366] gap-1">
+                        <Film className="h-5 w-5" />
+                        <span className="text-[9px] font-semibold uppercase tracking-wider">Video</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={m.fileUrl}
+                        alt={m.fileName || 'Shared media'}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
                   </button>
                 ))}
               </div>
             ) : (
               <p className="text-xs text-[#8696a0] py-2">No media shared yet</p>
             )
-          ) : fileMessages.length > 0 ? (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {fileMessages.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setViewingMediaUrl(m.fileUrl!);
-                    setViewingMediaName(m.fileName);
-                  }}
-                  className="flex w-full items-center gap-2.5 rounded-xl bg-[#202c33] p-2.5 text-left hover:bg-[#2a3942] transition"
-                >
-                  <FileText className="h-4 w-4 text-[#53bdeb] flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-[#e9edef] truncate">
-                      {m.fileName || 'Document'}
-                    </p>
-                    {m.fileSize && (
-                      <p className="tabular-nums text-[10px] text-[#8696a0]">
-                        {(m.fileSize / 1024).toFixed(1)} KB
+          ) : activeMediaTab === 'docs' ? (
+            fileMessages.length > 0 ? (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {fileMessages.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setViewingMediaUrl(m.fileUrl!);
+                      setViewingMediaName(m.fileName);
+                      setViewingMediaType(undefined);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl bg-[#202c33] p-2.5 text-left hover:bg-[#2a3942] transition"
+                  >
+                    <FileText className="h-4 w-4 text-[#53bdeb] flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-[#e9edef] truncate">
+                        {m.fileName || 'Document'}
                       </p>
-                    )}
+                      {m.fileSize && (
+                        <p className="tabular-nums text-[10px] text-[#8696a0]">
+                          {(m.fileSize / 1024).toFixed(1)} KB
+                        </p>
+                      )}
+                    </div>
+                    <Download className="h-3.5 w-3.5 text-[#8696a0]" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[#8696a0] py-2">No documents shared yet</p>
+            )
+          ) : sharedLinks.length > 0 ? (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {sharedLinks.map((item) => (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2.5 rounded-xl bg-[#202c33] p-2.5 hover:bg-[#2a3942] transition"
+                >
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#53bdeb]/15 text-[#53bdeb]">
+                    <LinkIcon className="h-4 w-4" />
                   </div>
-                  <Download className="h-3.5 w-3.5 text-[#8696a0]" />
-                </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-[#53bdeb] truncate">
+                      {item.url}
+                    </p>
+                    <p className="text-[10px] text-[#8696a0] truncate">
+                      Shared by {item.senderName}
+                    </p>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-[#8696a0] flex-shrink-0" />
+                </a>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-[#8696a0] py-2">No documents shared yet</p>
+            <p className="text-xs text-[#8696a0] py-2">No links shared yet</p>
           )}
         </div>
 
@@ -410,10 +707,10 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
               <span className="tabular-nums text-xs font-semibold text-[#e9edef]">
                 {conversation.participantIds?.length || 0} members
               </span>
-              {isGroupAdmin && onOpenAddMembers && (
+              {isGroupAdmin && (
                 <button
                   type="button"
-                  onClick={onOpenAddMembers}
+                  onClick={openAddMembersModal}
                   className="flex items-center gap-1 text-xs font-medium text-[#00a884] hover:underline"
                 >
                   <UserPlus className="h-3.5 w-3.5" />
@@ -493,6 +790,17 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             <span>Clear Chat Messages</span>
           </button>
 
+          {!isDirect && (
+            <button
+              type="button"
+              onClick={() => setShowLeaveConfirm(true)}
+              className="flex w-full items-center gap-4 px-6 py-3.5 text-xs font-semibold text-rose-400 hover:bg-[#202c33] transition"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Leave Group</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
@@ -528,8 +836,181 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
       <MediaViewerModal
         mediaUrl={viewingMediaUrl}
         fileName={viewingMediaName}
-        onClose={() => setViewingMediaUrl(null)}
+        mediaType={viewingMediaType}
+        onClose={() => {
+          setViewingMediaUrl(null);
+          setViewingMediaType(undefined);
+        }}
       />
+
+      {/* Edit Group Info Modal */}
+      <Modal
+        isOpen={showEditGroupModal}
+        onClose={() => setShowEditGroupModal(false)}
+        title="Edit Group Info"
+        maxWidth="sm"
+      >
+        <form onSubmit={handleSaveGroupInfo} className="space-y-4">
+          <div className="flex flex-col items-center">
+            <div
+              onClick={() => groupPhotoInputRef.current?.click()}
+              className="relative group cursor-pointer"
+            >
+              <Avatar src={editGroupPhoto} name={editGroupName || 'Group'} size="xl" />
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition">
+                <Camera className="h-5 w-5 text-white" />
+              </div>
+              <input
+                ref={groupPhotoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleGroupPhotoSelect}
+                className="hidden"
+              />
+            </div>
+            <span className="mt-2 text-[11px] text-[#8696a0]">Tap icon to change group photo</span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[#8696a0] mb-1">Group Name</label>
+            <input
+              type="text"
+              required
+              maxLength={45}
+              value={editGroupName}
+              onChange={(e) => setEditGroupName(e.target.value)}
+              className="w-full rounded-xl border border-[#222d34] bg-[#202c33] px-3 py-2 text-xs text-[#e9edef] focus:border-[#00a884] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[#8696a0] mb-1">Description</label>
+            <textarea
+              rows={3}
+              maxLength={180}
+              value={editGroupDesc}
+              onChange={(e) => setEditGroupDesc(e.target.value)}
+              placeholder="Add group description..."
+              className="w-full rounded-xl border border-[#222d34] bg-[#202c33] p-2.5 text-xs text-[#e9edef] focus:border-[#00a884] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEditGroupModal(false)}
+              className="rounded-xl px-4 py-2 text-xs font-semibold text-[#8696a0] hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingGroup}
+              className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] disabled:opacity-50"
+            >
+              {savingGroup ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Group Members Modal */}
+      <Modal
+        isOpen={showAddMembersModal}
+        onClose={() => setShowAddMembersModal(false)}
+        title="Add Participants"
+        subtitle={`Add members to ${title}`}
+        maxWidth="sm"
+      >
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
+            <input
+              type="text"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              placeholder="Search contacts..."
+              className="w-full rounded-xl border border-[#222d34] bg-[#202c33] pl-9 pr-3 py-2 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:border-[#00a884] focus:outline-none"
+            />
+          </div>
+
+          <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+            {loadingMembers ? (
+              <div className="flex items-center justify-center py-8 text-xs text-[#8696a0] gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-[#00a884]" />
+                <span>Loading contacts...</span>
+              </div>
+            ) : filteredCandidates.length === 0 ? (
+              <p className="text-center py-6 text-xs text-[#8696a0]">
+                No eligible contacts available to add.
+              </p>
+            ) : (
+              filteredCandidates.map((u) => {
+                const selected = selectedNewMemberIds.includes(u.uid);
+                return (
+                  <button
+                    key={u.uid}
+                    type="button"
+                    onClick={() =>
+                      setSelectedNewMemberIds((prev) =>
+                        prev.includes(u.uid)
+                          ? prev.filter((id) => id !== u.uid)
+                          : [...prev, u.uid]
+                      )
+                    }
+                    className={`flex w-full items-center justify-between rounded-xl p-2.5 text-left transition ${
+                      selected
+                        ? 'bg-[#00a884]/15 border border-[#00a884]/40'
+                        : 'bg-[#202c33]/60 hover:bg-[#202c33] border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar src={u.photoURL} name={u.displayName} size="sm" />
+                      <div className="min-w-0">
+                        <span className="text-xs font-semibold text-[#e9edef] block truncate">
+                          {u.displayName}
+                        </span>
+                        <span className="text-[10px] text-[#8696a0] font-mono block truncate">
+                          @{u.username}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                        selected
+                          ? 'border-[#00a884] bg-[#00a884] text-[#0b141a]'
+                          : 'border-[#8696a0]/50'
+                      }`}
+                    >
+                      {selected && <Check className="h-3 w-3 stroke-[3]" />}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowAddMembersModal(false)}
+              className="rounded-xl px-4 py-2 text-xs font-semibold text-[#8696a0] hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={addingMembers || selectedNewMemberIds.length === 0}
+              onClick={handleAddSelectedMembers}
+              className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] disabled:opacity-50"
+            >
+              {addingMembers
+                ? 'Adding...'
+                : `Add (${selectedNewMemberIds.length})`}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Starred Messages Modal */}
       <Modal
@@ -715,6 +1196,18 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
         description="This removes existing messages in this chat from your account while keeping the conversation."
         confirmText="Clear messages"
         variant="warning"
+      />
+
+      {/* Leave Group Confirmation */}
+      <ConfirmModal
+        isOpen={showLeaveConfirm}
+        onClose={() => setShowLeaveConfirm(false)}
+        loading={actionBusy}
+        onConfirm={handleLeaveGroup}
+        title={`Leave "${title}"?`}
+        description="You will stop receiving messages from this group unless an admin adds you again."
+        confirmText="Leave group"
+        variant="danger"
       />
 
       {/* Delete Chat Confirmation */}

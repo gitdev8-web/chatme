@@ -3,20 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Camera,
   Check,
   Edit2,
   Loader2,
-  Smile,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../common/Avatar';
 import { uploadFileWithProgress } from '../../services/storageService';
 import { useToast } from '../common/Toast';
-import { compressImage } from '../../utils/imageUtils';
+import { compressAvatarImage } from '../../utils/imageUtils';
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -51,7 +51,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (profile) {
       setDisplayName(profile.displayName || '');
       setBio(profile.bio || 'Hey there! I am using DEV CHAT.');
@@ -70,7 +70,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
       await updateProfileData({ displayName: displayName.trim() });
       setIsEditingName(false);
       showToast('Name updated successfully', 'success');
-    } catch (err) {
+    } catch {
       showToast('Failed to update name', 'error');
     } finally {
       setNameSaving(false);
@@ -85,7 +85,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
       setIsEditingBio(false);
       setBio(textToSave);
       showToast('About updated successfully', 'success');
-    } catch (err) {
+    } catch {
       showToast('Failed to update about', 'error');
     } finally {
       setBioSaving(false);
@@ -93,30 +93,57 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setUploadingPhoto(true);
-      try {
-        let fileToUpload = file;
-        try {
-          const compressed = await compressImage(file, 512, 0.85);
-          fileToUpload = compressed.file;
-        } catch {}
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file', 'error');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const compressed = await compressAvatarImage(file);
+      let finalUrl = '';
+      try {
         const res = await uploadFileWithProgress(
-          fileToUpload,
-          `profiles/${user.uid}`,
-          `avatar_${Date.now()}`
+          compressed.file,
+          `avatars/${user.uid}`,
+          `avatar_${user.uid}_${Date.now()}.jpg`
         );
-        if (res.url) {
-          await updateProfileData({ photoURL: res.url });
-          showToast('Profile photo updated', 'success');
+        finalUrl = res.url || compressed.dataUrl;
+      } catch {
+        if (compressed.dataUrl.length <= 220_000) {
+          finalUrl = compressed.dataUrl;
+        } else {
+          throw new Error('Photo upload failed');
         }
-      } catch (err) {
-        showToast('Failed to update photo', 'error');
-      } finally {
-        setUploadingPhoto(false);
       }
+
+      if (!finalUrl) {
+        throw new Error('Could not generate profile photo URL');
+      }
+
+      await updateProfileData({ photoURL: finalUrl });
+      showToast('Profile photo updated', 'success');
+    } catch {
+      showToast('Failed to update profile photo', 'error');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (uploadingPhoto || !profile?.photoURL) return;
+    setUploadingPhoto(true);
+    try {
+      await updateProfileData({ photoURL: '' });
+      showToast('Profile photo removed', 'info');
+    } catch {
+      showToast('Failed to remove profile photo', 'error');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -126,6 +153,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
       <div className="flex h-28 items-end bg-[#202c33] px-5 pb-4">
         <div className="flex items-center gap-6 text-[#e9edef]">
           <button
+            type="button"
             onClick={onClose}
             className="rounded-full p-1 text-[#e9edef] hover:bg-[#111b21]/50 transition"
             title="Back to chats"
@@ -141,14 +169,13 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
         {/* Photo Container */}
         <div className="flex flex-col items-center justify-center">
           <div
-            onClick={() => fileInputRef.current?.click()}
-            className="group relative h-48 w-48 rounded-full overflow-hidden cursor-pointer shadow-2xl ring-4 ring-[#202c33] bg-[#202c33] flex items-center justify-center"
+            onClick={() => !uploadingPhoto && fileInputRef.current?.click()}
+            className="group relative h-44 w-44 rounded-full overflow-hidden cursor-pointer shadow-2xl ring-4 ring-[#202c33] bg-[#202c33] flex items-center justify-center"
           >
             <Avatar
               src={profile?.photoURL}
               name={profile?.displayName || 'User'}
-              size="2xl"
-              className="h-full w-full object-cover"
+              size="3xl"
             />
 
             {/* Hover overlay */}
@@ -163,6 +190,29 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
               <div className="absolute inset-0 flex items-center justify-center bg-black/70">
                 <Loader2 className="h-8 w-8 animate-spin text-[#00a884]" />
               </div>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              disabled={uploadingPhoto}
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#202c33] px-3 py-1.5 text-xs font-medium text-[#00a884] hover:bg-[#2a3942] disabled:opacity-50 transition"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              <span>{profile?.photoURL ? 'Change photo' : 'Add photo'}</span>
+            </button>
+            {profile?.photoURL && (
+              <button
+                type="button"
+                disabled={uploadingPhoto}
+                onClick={handleRemovePhoto}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#202c33] px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-[#2a3942] disabled:opacity-50 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Remove</span>
+              </button>
             )}
           </div>
 
@@ -197,6 +247,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
                 {25 - displayName.length}
               </span>
               <button
+                type="button"
                 onClick={handleSaveName}
                 disabled={nameSaving}
                 className="rounded p-1 text-[#8696a0] hover:text-[#00a884] transition"
@@ -214,6 +265,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
                 {profile?.displayName || 'Set your name'}
               </span>
               <button
+                type="button"
                 onClick={() => setIsEditingName(true)}
                 className="p-1 text-[#8696a0] hover:text-[#e9edef] transition"
               >
@@ -246,6 +298,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
                 autoFocus
               />
               <button
+                type="button"
                 onClick={() => handleSaveBio()}
                 disabled={bioSaving}
                 className="rounded p-1 text-[#8696a0] hover:text-[#00a884] transition"
@@ -263,6 +316,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
                 {profile?.bio || 'Hey there! I am using DEV CHAT.'}
               </span>
               <button
+                type="button"
                 onClick={() => setIsEditingBio(true)}
                 className="p-1 text-[#8696a0] hover:text-[#e9edef] transition"
               >

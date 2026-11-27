@@ -234,6 +234,7 @@ export async function sendMessage(
     const convRef = doc(db, 'conversations', conversationId);
     let previewText = text || '';
     if (type === 'image') previewText = options?.viewOnce ? '📷 View once photo' : '📷 Photo';
+    else if (type === 'video') previewText = '🎬 Video';
     else if (type === 'voice') previewText = '🎤 Voice message';
     else if (type === 'file') previewText = `📎 ${options?.fileName || 'File'}`;
     else if (type === 'poll') previewText = `📊 Poll: ${options?.poll?.question || text}`;
@@ -628,6 +629,34 @@ export async function toggleGroupAdmin(
     });
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `conversations/${conversationId}`);
+  }
+}
+
+export async function sendGroupSystemNotice(
+  conversationId: string,
+  actorUid: string,
+  text: string
+): Promise<void> {
+  const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const sysMsg: Message = {
+    id: msgId,
+    conversationId,
+    senderId: actorUid,
+    senderName: 'System',
+    text,
+    type: 'system',
+    createdAt: new Date().toISOString(),
+    reactions: {},
+    readBy: [actorUid],
+    deliveredTo: [actorUid],
+  };
+  try {
+    await setDoc(
+      doc(db, 'conversations', conversationId, 'messages', msgId),
+      sanitizeForFirestore(sysMsg)
+    );
+  } catch {
+    // Non-critical notice
   }
 }
 

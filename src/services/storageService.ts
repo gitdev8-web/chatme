@@ -13,6 +13,8 @@ export interface UploadResult {
   type: string;
 }
 
+const MAX_INLINE_DATA_URL_BYTES = 700_000;
+
 /**
  * Fast helper to read file into data URL
  */
@@ -23,6 +25,18 @@ function readFileAsDataUrl(file: File | Blob): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+async function safeDataUrlFallback(file: File | Blob): Promise<string> {
+  if (file.size > MAX_INLINE_DATA_URL_BYTES) {
+    return '';
+  }
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    return dataUrl.length <= MAX_INLINE_DATA_URL_BYTES ? dataUrl : '';
+  } catch {
+    return '';
+  }
 }
 
 export async function uploadFileWithProgress(
@@ -48,28 +62,40 @@ export async function uploadFileWithProgress(
     };
     const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const uploadPromise = new Promise<UploadResult>((resolve, reject) => {
       uploadTask.on(
         'state_changed',
         (snapshot) => {
+          if (settled) return;
           if (onProgress && snapshot.totalBytes > 0) {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
             onProgress(Math.round(progress));
           }
         },
         async (error) => {
-          console.warn('Storage upload warning, using local file representation fallback:', error);
-          try {
-            const dataUrl = await readFileAsDataUrl(file);
+          if (settled) return;
+          settled = true;
+          if (timeoutId) clearTimeout(timeoutId);
+          console.warn('Storage upload failed, checking safe fallback:', error);
+          const inlineUrl = await safeDataUrlFallback(file);
+          if (inlineUrl) {
             resolve({
               ...fallbackResult,
-              url: dataUrl,
+              url: inlineUrl,
             });
-          } catch (e) {
-            reject(e);
+          } else {
+            reject(
+              new Error('Upload failed. Check your connection or try a smaller file.')
+            );
           }
         },
         async () => {
+          if (settled) return;
+          settled = true;
+          if (timeoutId) clearTimeout(timeoutId);
           try {
             const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
             resolve({
@@ -77,40 +103,53 @@ export async function uploadFileWithProgress(
               url: downloadUrl,
             });
           } catch {
-            const dataUrl = await readFileAsDataUrl(file);
-            resolve({
-              ...fallbackResult,
-              url: dataUrl,
-            });
+            const inlineUrl = await safeDataUrlFallback(file);
+            if (inlineUrl) {
+              resolve({
+                ...fallbackResult,
+                url: inlineUrl,
+              });
+            } else {
+              reject(new Error('Could not retrieve uploaded file URL.'));
+            }
           }
         }
       );
     });
 
-    // 2s timeout race so offline or unprovisioned storage never hangs the user
-    const timeoutPromise = new Promise<UploadResult>((resolve) => {
-      setTimeout(async () => {
+    // 12s timeout so real Storage uploads complete reliably without hanging offline users
+    const timeoutPromise = new Promise<UploadResult>((resolve, reject) => {
+      timeoutId = setTimeout(async () => {
+        if (settled) return;
+        settled = true;
         try {
-          const dataUrl = await readFileAsDataUrl(file);
-          resolve({
-            ...fallbackResult,
-            url: dataUrl,
-          });
+          uploadTask.cancel();
         } catch {
+          // Ignore cancel error
+        }
+        const inlineUrl = await safeDataUrlFallback(file);
+        if (inlineUrl) {
           resolve({
             ...fallbackResult,
-            url: '',
+            url: inlineUrl,
           });
+        } else {
+          reject(
+            new Error('Upload timed out. Please check your connection or use a smaller file.')
+          );
         }
-      }, 2000);
+      }, 12000);
     });
 
     return await Promise.race([uploadPromise, timeoutPromise]);
   } catch (err) {
-    const dataUrl = await readFileAsDataUrl(file);
-    return {
-      ...fallbackResult,
-      url: dataUrl,
-    };
+    const inlineUrl = await safeDataUrlFallback(file);
+    if (inlineUrl) {
+      return {
+        ...fallbackResult,
+        url: inlineUrl,
+      };
+    }
+    throw err instanceof Error ? err : new Error('File upload failed');
   }
 }

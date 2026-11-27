@@ -69,6 +69,7 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
           poll: message.poll,
           location: message.location,
           contactCard: message.contactCard,
+          meet: message.meet,
         }
       );
 
@@ -87,6 +88,8 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
       ? message.text
       : message.type === 'image'
       ? '📷 Photo'
+      : message.type === 'video'
+      ? '🎬 Video'
       : message.type === 'voice'
       ? '🎤 Voice Message'
       : message.type === 'poll'
@@ -95,6 +98,8 @@ export const ForwardModal: React.FC<ForwardModalProps> = ({
       ? `📍 ${message.location?.label || 'Location'}`
       : message.type === 'contact'
       ? `👤 ${message.contactCard?.displayName || 'Contact'}`
+      : message.type === 'meet'
+      ? `📹 Google Meet (${message.meet?.meetingCode || 'Video Call'})`
       : `📎 ${message.fileName || 'File'}`;
 
   return (

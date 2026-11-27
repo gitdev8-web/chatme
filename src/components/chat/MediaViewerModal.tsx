@@ -9,17 +9,24 @@ import { X, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 interface MediaViewerModalProps {
   mediaUrl: string | null;
   fileName?: string;
+  mediaType?: 'image' | 'video';
   onClose: () => void;
 }
 
 export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({
   mediaUrl,
   fileName = 'Media',
+  mediaType,
   onClose,
 }) => {
   const [scale, setScale] = useState(1);
 
   if (!mediaUrl) return null;
+
+  const isVideo =
+    mediaType === 'video' ||
+    mediaUrl.startsWith('data:video/') ||
+    /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(fileName || mediaUrl);
 
   const handleDownload = () => {
     const link = document.createElement('a');
@@ -40,28 +47,36 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({
         </span>
 
         <div className="flex items-center gap-2">
+          {!isVideo && (
+            <>
+              <button
+                type="button"
+                onClick={() => setScale((s) => Math.min(s + 0.25, 3))}
+                className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
+                title="Zoom In"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setScale((s) => Math.max(s - 0.25, 0.5))}
+                className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
+                title="Zoom Out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setScale(1)}
+                className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
+                title="Reset Zoom"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </>
+          )}
           <button
-            onClick={() => setScale((s) => Math.min(s + 0.25, 3))}
-            className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
-            title="Zoom In"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setScale((s) => Math.max(s - 0.25, 0.5))}
-            className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
-            title="Zoom Out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setScale(1)}
-            className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
-            title="Reset Zoom"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-          <button
+            type="button"
             onClick={handleDownload}
             className="rounded-xl p-2 bg-slate-900/60 hover:bg-slate-800 text-slate-200 transition"
             title="Download"
@@ -69,6 +84,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({
             <Download className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="rounded-xl p-2 bg-slate-900/60 hover:bg-rose-900/60 text-slate-200 hover:text-rose-200 transition"
             title="Close"
@@ -78,19 +94,29 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({
         </div>
       </div>
 
-      {/* Main Image */}
+      {/* Main Media */}
       <div
         className="flex items-center justify-center max-w-full max-h-full overflow-hidden"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <img
-          src={mediaUrl}
-          alt={fileName}
-          className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl transition-transform duration-150"
-          style={{ transform: `scale(${scale})` }}
-        />
+        {isVideo ? (
+          <video
+            src={mediaUrl}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-[85vh] max-w-[90vw] rounded-lg shadow-2xl bg-black"
+          />
+        ) : (
+          <img
+            src={mediaUrl}
+            alt={fileName}
+            className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl transition-transform duration-150"
+            style={{ transform: `scale(${scale})` }}
+          />
+        )}
       </div>
     </div>
   );

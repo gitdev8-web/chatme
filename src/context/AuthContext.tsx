@@ -34,6 +34,67 @@ import {
   subscribeMeetAuthState,
 } from '../services/googleMeetService';
 
+const PROFILE_CACHE_PREFIX = 'devchat_profile_cache_';
+
+function readCachedProfile(uid: string): UserProfile | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(`${PROFILE_CACHE_PREFIX}${uid}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UserProfile;
+    return parsed && parsed.uid === uid ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(profile: UserProfile | null): void {
+  try {
+    if (typeof window === 'undefined' || !profile?.uid) return;
+    localStorage.setItem(`${PROFILE_CACHE_PREFIX}${profile.uid}`, JSON.stringify(profile));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function clearCachedProfile(uid?: string | null): void {
+  try {
+    if (typeof window === 'undefined' || !uid) return;
+    localStorage.removeItem(`${PROFILE_CACHE_PREFIX}${uid}`);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Firebase Auth rejects data: URLs or URLs exceeding ~2048 chars with auth/invalid-profile-attribute.
+ * Keep compressed data: URLs in Firestore while safely syncing short HTTP URLs or clears to Auth.
+ */
+async function syncFirebaseAuthProfile(
+  currentUser: User,
+  displayName?: string,
+  photoURL?: string
+): Promise<void> {
+  try {
+    const authPayload: { displayName?: string; photoURL?: string | null } = {};
+    if (displayName !== undefined) {
+      authPayload.displayName = displayName;
+    }
+    if (photoURL !== undefined) {
+      if (photoURL === '') {
+        authPayload.photoURL = '';
+      } else if (photoURL.startsWith('http') && photoURL.length < 1800) {
+        authPayload.photoURL = photoURL;
+      }
+    }
+    if (Object.keys(authPayload).length > 0) {
+      await updateProfile(currentUser, authPayload);
+    }
+  } catch (err) {
+    console.warn('Non-blocking Auth profile sync notice:', err);
+  }
+}
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
@@ -79,65 +140,109 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return subscribeMeetAuthState(setMeetConnected);
   }, []);
 
-  // Sync profile from Firestore
+  // Sync profile from Firestore without ever overwriting an existing profile on slow cold-starts
   const fetchUserProfile = async (currentUser: User): Promise<UserProfile | null> => {
     const userDocRef = doc(db, 'users', currentUser.uid);
+
+    // Instant local hydration while Firestore read is in flight
+    const cached = readCachedProfile(currentUser.uid);
+    if (cached) {
+      setProfile((prev) => prev || cached);
+    }
+
     try {
-      const getDocWithTimeout = Promise.race([
+      const snap = await Promise.race([
         getDoc(userDocRef),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore timeout')), 2500)
+          setTimeout(() => reject(new Error('Firestore timeout')), 8000)
         ),
       ]);
 
-      const snap = await getDocWithTimeout;
-      if (snap && snap.exists()) {
-        const data = snap.data() as UserProfile;
+      if (snap.exists()) {
+        const data = { ...(snap.data() as UserProfile), uid: currentUser.uid };
         setProfile(data);
+        writeCachedProfile(data);
         return data;
       }
-    } catch {
-      // Fallback
-    }
 
-    const defaultUsername = (currentUser.email?.split('@')[0] || `user_${currentUser.uid.slice(0, 5)}`)
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, '')
-      .slice(0, 20);
+      // Confirmed document does NOT exist yet — safely create initial profile
+      const defaultUsername = (currentUser.email?.split('@')[0] || `user_${currentUser.uid.slice(0, 5)}`)
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '')
+        .slice(0, 20);
 
-    const newProfile: UserProfile = {
-      uid: currentUser.uid,
-      email: currentUser.email || '',
-      displayName: currentUser.displayName || 'DEV CHAT User',
-      username: defaultUsername || `user_${currentUser.uid.slice(0, 5)}`,
-      photoURL: currentUser.photoURL || '',
-      bio: 'Hey there! I am using DEV CHAT.',
-      status: 'Available',
-      isOnline: true,
-      lastSeen: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      showOnlineStatus: true,
-      showLastSeen: true,
-      readReceipts: true,
-      enterToSend: true,
-      theme: 'dark',
-      blockedUserIds: [],
-    };
-
-    setProfile(newProfile);
-
-    // Save in background with merge
-    Promise.allSettled([
-      setDoc(userDocRef, newProfile, { merge: true }),
-      setDoc(doc(db, 'usernames', newProfile.username), {
+      const newProfile: UserProfile = {
         uid: currentUser.uid,
-        username: newProfile.username,
+        email: currentUser.email || '',
+        displayName: currentUser.displayName || 'DEV CHAT User',
+        username: defaultUsername || `user_${currentUser.uid.slice(0, 5)}`,
+        photoURL: currentUser.photoURL || '',
+        bio: 'Hey there! I am using DEV CHAT.',
+        status: 'Available',
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
         createdAt: new Date().toISOString(),
-      }, { merge: true }),
-    ]).catch(() => {});
+        updatedAt: new Date().toISOString(),
+        showOnlineStatus: true,
+        showLastSeen: true,
+        readReceipts: true,
+        enterToSend: true,
+        theme: 'dark',
+        blockedUserIds: [],
+      };
 
-    return newProfile;
+      setProfile(newProfile);
+      writeCachedProfile(newProfile);
+
+      await Promise.allSettled([
+        setDoc(userDocRef, newProfile, { merge: true }),
+        setDoc(
+          doc(db, 'usernames', newProfile.username),
+          {
+            uid: currentUser.uid,
+            username: newProfile.username,
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        ),
+      ]);
+
+      return newProfile;
+    } catch {
+      // On network failure or timeout, NEVER overwrite Firestore with blank defaults.
+      // Return cached profile if available, or an in-memory placeholder until onSnapshot syncs.
+      if (cached) {
+        setProfile(cached);
+        return cached;
+      }
+
+      const transientUsername = (currentUser.email?.split('@')[0] || `user_${currentUser.uid.slice(0, 5)}`)
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '')
+        .slice(0, 20);
+
+      const transientProfile: UserProfile = {
+        uid: currentUser.uid,
+        email: currentUser.email || '',
+        displayName: currentUser.displayName || 'DEV CHAT User',
+        username: transientUsername || `user_${currentUser.uid.slice(0, 5)}`,
+        photoURL: currentUser.photoURL || '',
+        bio: 'Hey there! I am using DEV CHAT.',
+        status: 'Available',
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        showOnlineStatus: true,
+        showLastSeen: true,
+        readReceipts: true,
+        enterToSend: true,
+        theme: 'dark',
+        blockedUserIds: [],
+      };
+      setProfile((prev) => prev || transientProfile);
+      return transientProfile;
+    }
   };
 
   const checkAdminStatus = async (currentUser: User) => {
@@ -182,9 +287,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         presenceCleanup = initializePresence(currentUser.uid);
 
         // Real-time listener for current user profile changes
+        if (profileUnsub) {
+          profileUnsub();
+        }
         profileUnsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
           if (snap.exists()) {
-            setProfile(snap.data() as UserProfile);
+            const data = { ...(snap.data() as UserProfile), uid: currentUser.uid };
+            setProfile(data);
+            writeCachedProfile(data);
           }
         });
       } else {
@@ -221,7 +331,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUid && data?.uid === currentUid) return true;
       return false;
     } catch {
-      return true; // Graceful fallback
+      return true;
     }
   };
 
@@ -272,22 +382,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setProfile(newProfile);
+    writeCachedProfile(newProfile);
     if (email.toLowerCase() === 'gitdev8@gmail.com') {
       setIsAdmin(true);
     }
 
-    Promise.allSettled([
-      updateProfile(currentUser, {
-        displayName: displayName.trim(),
-        photoURL: photoURL || '',
-      }),
+    await Promise.allSettled([
+      syncFirebaseAuthProfile(currentUser, displayName.trim(), photoURL || ''),
       setDoc(doc(db, 'users', currentUser.uid), newProfile, { merge: true }),
-      setDoc(doc(db, 'usernames', cleanedUsername), {
-        uid: currentUser.uid,
-        username: cleanedUsername,
-        createdAt: new Date().toISOString(),
-      }, { merge: true }),
-    ]).catch(() => {});
+      setDoc(
+        doc(db, 'usernames', cleanedUsername),
+        {
+          uid: currentUser.uid,
+          username: cleanedUsername,
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true }
+      ),
+    ]);
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
@@ -312,55 +424,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    const currentUid = auth.currentUser?.uid || user?.uid;
     clearMeetAccessToken();
     await updatePresence(false);
     await signOut(auth);
+    clearCachedProfile(currentUid);
     setProfile(null);
     setUser(null);
   };
 
   const updateProfileData = async (updates: Partial<UserProfile>) => {
     const currentUser = user || auth.currentUser;
-    if (!currentUser) return;
-    const currentProfile = profile || {
-      uid: currentUser.uid,
-      email: currentUser.email || '',
-      displayName: currentUser.displayName || 'DEV CHAT User',
-      username: `user_${currentUser.uid.slice(0, 5)}`,
-      photoURL: currentUser.photoURL || '',
-      bio: 'Hey there! I am using DEV CHAT.',
-      status: 'Available',
-      isOnline: true,
-      lastSeen: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      showOnlineStatus: true,
-      showLastSeen: true,
-      readReceipts: true,
-      enterToSend: true,
-      theme: 'dark',
-      blockedUserIds: [],
-    };
-    const updated = { ...currentProfile, ...updates, updatedAt: new Date().toISOString() };
-    setProfile(updated);
+    if (!currentUser) {
+      throw new Error('You must be signed in to update your profile.');
+    }
 
-    try {
-      await setDoc(doc(db, 'users', currentUser.uid), updated, { merge: true });
-      if (updates.displayName || updates.photoURL !== undefined) {
-        await updateProfile(currentUser, {
-          displayName: updates.displayName || currentProfile.displayName,
-          photoURL: updates.photoURL !== undefined ? updates.photoURL : currentProfile.photoURL,
-        });
-      }
-      if (updates.username) {
-        await setDoc(doc(db, 'usernames', updates.username), {
+    const baseProfile: UserProfile = profile ||
+      readCachedProfile(currentUser.uid) || {
+        uid: currentUser.uid,
+        email: currentUser.email || '',
+        displayName: currentUser.displayName || 'DEV CHAT User',
+        username: `user_${currentUser.uid.slice(0, 5)}`,
+        photoURL: currentUser.photoURL || '',
+        bio: 'Hey there! I am using DEV CHAT.',
+        status: 'Available',
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        showOnlineStatus: true,
+        showLastSeen: true,
+        readReceipts: true,
+        enterToSend: true,
+        theme: 'dark',
+        blockedUserIds: [],
+      };
+
+    const updated: UserProfile = {
+      ...baseProfile,
+      ...updates,
+      uid: currentUser.uid,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Persist to Firestore first so failures surface clearly, while keeping local cache synced
+    await setDoc(doc(db, 'users', currentUser.uid), updated, { merge: true });
+    setProfile(updated);
+    writeCachedProfile(updated);
+
+    if (updates.username) {
+      await setDoc(
+        doc(db, 'usernames', updates.username),
+        {
           uid: currentUser.uid,
           username: updates.username,
           createdAt: new Date().toISOString(),
-        }, { merge: true });
-      }
-    } catch (err) {
-      console.warn('Profile update notice:', err);
+        },
+        { merge: true }
+      ).catch(() => {});
+    }
+
+    if (updates.displayName !== undefined || updates.photoURL !== undefined) {
+      await syncFirebaseAuthProfile(
+        currentUser,
+        updates.displayName ?? updated.displayName,
+        updates.photoURL !== undefined ? updates.photoURL : updated.photoURL
+      );
     }
   };
 
@@ -399,19 +528,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUser(currentUser);
     setProfile(newProfile);
+    writeCachedProfile(newProfile);
 
-    Promise.allSettled([
-      updateProfile(currentUser, {
-        displayName: displayName.trim() || 'DEV CHAT User',
-        photoURL: photoURL || '',
-      }),
+    await Promise.allSettled([
+      syncFirebaseAuthProfile(
+        currentUser,
+        displayName.trim() || 'DEV CHAT User',
+        photoURL || ''
+      ),
       setDoc(doc(db, 'users', currentUser.uid), newProfile, { merge: true }),
-      setDoc(doc(db, 'usernames', cleanedUsername), {
-        uid: currentUser.uid,
-        username: cleanedUsername,
-        createdAt: new Date().toISOString(),
-      }, { merge: true }),
-    ]).catch(() => {});
+      setDoc(
+        doc(db, 'usernames', cleanedUsername),
+        {
+          uid: currentUser.uid,
+          username: cleanedUsername,
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true }
+      ),
+    ]);
 
     return newProfile;
   };
@@ -444,16 +579,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setProfile(demoProfile);
+    writeCachedProfile(demoProfile);
     setUser(currentUser);
 
-    Promise.allSettled([
+    await Promise.allSettled([
       setDoc(doc(db, 'users', currentUser.uid), demoProfile, { merge: true }),
-      setDoc(doc(db, 'usernames', demoProfile.username), {
-        uid: currentUser.uid,
-        username: demoProfile.username,
-        createdAt: new Date().toISOString(),
-      }, { merge: true }),
-    ]).catch(() => {});
+      setDoc(
+        doc(db, 'usernames', demoProfile.username),
+        {
+          uid: currentUser.uid,
+          username: demoProfile.username,
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true }
+      ),
+    ]);
   };
 
   const refreshProfile = async () => {
@@ -464,9 +604,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteAccount = async () => {
     if (!user) return;
+    const uid = user.uid;
     try {
       await signOut(auth);
       await deleteUser(user);
+      clearCachedProfile(uid);
       setProfile(null);
       setUser(null);
     } catch (err) {

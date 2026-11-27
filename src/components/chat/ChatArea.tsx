@@ -18,6 +18,8 @@ import {
   Flag,
   Pin,
   Palette,
+  Ban,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -33,6 +35,7 @@ import { ForwardModal } from './ForwardModal';
 import { MessageInfoModal } from './MessageInfoModal';
 import { WallpaperModal } from './WallpaperModal';
 import { CallModal } from '../calls/CallModal';
+import { GoogleMeetModal } from '../calls/GoogleMeetModal';
 import { StatusViewerModal } from '../status/StatusViewerModal';
 import { StatusRing } from '../status/StatusRing';
 import { isStoryViewedBy } from '../../services/statusService';
@@ -64,7 +67,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   maxFileSizeMb = 25,
   maintenanceMode = false,
 }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, updateProfileData } = useAuth();
   const { showToast } = useToast();
   const {
     activeConversationId,
@@ -86,6 +89,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     unpinMessage,
     openViewOnceMedia,
     startDirectChat,
+    sendMeetMessage,
     setReplyingTo,
     setActiveConversationId,
     markActiveConversationRead,
@@ -108,12 +112,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const [viewingMediaUrl, setViewingMediaUrl] = useState<string | null>(null);
   const [viewingMediaName, setViewingMediaName] = useState<string | undefined>(undefined);
+  const [viewingMediaType, setViewingMediaType] = useState<'image' | 'video' | undefined>(undefined);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearingChat, setClearingChat] = useState(false);
+  const [unreadDividerInfo, setUnreadDividerInfo] = useState<{
+    convId: string;
+    firstUnreadId: string;
+    count: number;
+  } | null>(null);
+  const unreadCapturedForConvRef = useRef<string | null>(null);
 
   // Calling state
   const [isCallOpen, setIsCallOpen] = useState(false);
+  const [isMeetOpen, setIsMeetOpen] = useState(false);
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [activeCallSessionId, setActiveCallSessionId] = useState<string | undefined>(undefined);
 
@@ -213,9 +225,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   useEffect(() => {
     setSearchInChat(false);
     setChatSearchTerm('');
+    setUnreadDividerInfo(null);
+    unreadCapturedForConvRef.current = null;
     scrollToBottom(false);
     markActiveConversationRead();
   }, [activeConversation?.id, markActiveConversationRead]);
+
+  // Capture initial unread boundary once per conversation open so the user sees where new messages start
+  useEffect(() => {
+    const convId = activeConversation?.id;
+    if (!convId || !user || loadingMessages) return;
+    if (unreadCapturedForConvRef.current === convId) return;
+    if (!messages || messages.length === 0) return;
+
+    unreadCapturedForConvRef.current = convId;
+    const unreadIncoming = messages.filter(
+      (m) => m.senderId !== user.uid && (!m.readBy || !m.readBy.includes(user.uid))
+    );
+    if (unreadIncoming.length > 0 && unreadIncoming.length < messages.length) {
+      setUnreadDividerInfo({
+        convId,
+        firstUnreadId: unreadIncoming[0].id,
+        count: unreadIncoming.length,
+      });
+    }
+  }, [activeConversation?.id, user, loadingMessages, messages]);
 
   useEffect(() => {
     if (!showScrollBottom && !chatSearchTerm.trim()) {
@@ -295,6 +329,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
 
     setCallType(type);
+
+    if (type === 'video') {
+      setIsMeetOpen(true);
+      return;
+    }
 
     let targetUid = partnerId;
     if ((!targetUid || targetUid === user.uid) && activeConversation?.id?.startsWith('dm_')) {
@@ -434,6 +473,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const unreadInActive = activeConversation.unreadCounts?.[user?.uid || ''] || 0;
   const activeMatchId = matchingMessageIds[matchCursor];
+  const isPartnerBlocked = Boolean(
+    isDirect && partnerId && profile?.blockedUserIds?.includes(partnerId)
+  );
 
   const getMessageReceiptInfo = (
     msg: Message
@@ -563,37 +605,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-1 text-[#aebac1] flex-shrink-0">
+          <button
+            onClick={() => handleStartCall('video')}
+            className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
+              videoCallsEnabled
+                ? 'hover:bg-[#374248] hover:text-[#25d366]'
+                : 'opacity-40 cursor-not-allowed'
+            }`}
+            title={videoCallsEnabled ? 'Start Google Meet video call' : 'Video calls disabled'}
+            aria-label="Google Meet video call"
+          >
+            <Video className="h-5 w-5" />
+          </button>
+
           {isDirect && (
-            <>
-              <button
-                onClick={() => handleStartCall('video')}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
-                  videoCallsEnabled
-                    ? 'hover:bg-[#374248] hover:text-[#e9edef]'
-                    : 'opacity-40 cursor-not-allowed'
-                }`}
-                title={videoCallsEnabled ? 'Video call' : 'Video calls disabled'}
-                aria-label="Video call"
-              >
-                <Video className="h-5 w-5" />
-              </button>
-
-              <button
-                onClick={() => handleStartCall('audio')}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
-                  voiceCallsEnabled
-                    ? 'hover:bg-[#374248] hover:text-[#e9edef]'
-                    : 'opacity-40 cursor-not-allowed'
-                }`}
-                title={voiceCallsEnabled ? 'Voice call' : 'Voice calls disabled'}
-                aria-label="Voice call"
-              >
-                <Phone className="h-5 w-5" />
-              </button>
-
-              <div className="hidden sm:block h-4 w-[1px] bg-[#374248] mx-1" />
-            </>
+            <button
+              onClick={() => handleStartCall('audio')}
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
+                voiceCallsEnabled
+                  ? 'hover:bg-[#374248] hover:text-[#e9edef]'
+                  : 'opacity-40 cursor-not-allowed'
+              }`}
+              title={voiceCallsEnabled ? 'Voice call' : 'Voice calls disabled'}
+              aria-label="Voice call"
+            >
+              <Phone className="h-5 w-5" />
+            </button>
           )}
+
+          <div className="hidden sm:block h-4 w-[1px] bg-[#374248] mx-1" />
 
           <button
             onClick={() => {
@@ -793,8 +833,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <MessagesSkeleton />
           </div>
         ) : (messages || []).length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center text-center text-xs text-[#8696a0]">
+          <div className="flex h-64 flex-col items-center justify-center text-center text-xs text-[#8696a0] gap-3">
             <span>Say hi to start the conversation!</span>
+            {!isPartnerBlocked && !maintenanceMode && (
+              <button
+                type="button"
+                onClick={() => void sendTextMessage('Hey! 👋')}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#00a884]/35 bg-[#182229] px-4 py-2 text-xs font-semibold text-[#25d366] hover:bg-[#202c33] transition active:scale-95"
+              >
+                <Send className="h-3.5 w-3.5" />
+                <span>Wave hello 👋</span>
+              </button>
+            )}
           </div>
         ) : (
           (messages || []).map((msg, idx) => {
@@ -803,6 +853,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               !prevMsg ||
               new Date(msg.createdAt).toDateString() !==
                 new Date(prevMsg.createdAt).toDateString();
+            const showUnreadDivider =
+              unreadDividerInfo?.convId === activeConversation.id &&
+              unreadDividerInfo.firstUnreadId === msg.id;
             const isMatch = matchingMessageIds.includes(msg.id);
             const isCurrentMatch = activeMatchId === msg.id;
             const isOutgoing = msg.senderId === user?.uid;
@@ -815,6 +868,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span className="rounded-lg bg-[#182229] border border-[#222d34]/70 px-3 py-1 text-[11px] font-medium text-[#8696a0] shadow-sm uppercase tracking-wider">
                       {formatDateHeader(msg.createdAt)}
                     </span>
+                  </div>
+                )}
+                {showUnreadDivider && unreadDividerInfo && (
+                  <div className="my-3 flex items-center gap-3 px-2 select-none">
+                    <div className="h-px flex-1 bg-[#00a884]/30" />
+                    <span className="tabular-nums rounded-lg border border-[#00a884]/35 bg-[#182229] px-3 py-1 text-[11px] font-semibold text-[#25d366] shadow-sm">
+                      {unreadDividerInfo.count}{' '}
+                      {unreadDividerInfo.count === 1 ? 'unread message' : 'unread messages'}
+                    </span>
+                    <div className="h-px flex-1 bg-[#00a884]/30" />
                   </div>
                 )}
                 <MessageBubble
@@ -848,9 +911,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   onVotePoll={votePoll}
                   onOpenViewOnce={(m) => openViewOnceMedia(m.id)}
                   onMessageContact={(uid) => startDirectChat(uid)}
-                  onOpenMedia={(url, name) => {
+                  onOpenMedia={(url, name, mediaType) => {
                     setViewingMediaUrl(url);
                     setViewingMediaName(name);
+                    setViewingMediaType(mediaType);
                   }}
                   onScrollToMessage={scrollToAndHighlightMessage}
                   onForward={(m) => setForwardingMessage(m)}
@@ -906,19 +970,42 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </button>
       )}
 
-      {/* Message Composer (Bottom Bar) */}
-      <MessageComposer
-        onSendTextMessage={sendTextMessage}
-        onSendFileMessage={sendFileMessage}
-        maxFileSizeMb={maxFileSizeMb}
-        disabled={maintenanceMode}
-      />
+      {/* Message Composer or Blocked Banner */}
+      {isPartnerBlocked && partnerId ? (
+        <div className="border-t border-[#222d34] bg-[#202c33] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-center flex-shrink-0 z-20">
+          <button
+            type="button"
+            onClick={async () => {
+              const updated = (profile?.blockedUserIds || []).filter((id) => id !== partnerId);
+              await updateProfileData({ blockedUserIds: updated });
+              showToast(`${title} unblocked`, 'info');
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-rose-500/30 bg-[#111b21] px-4 py-2.5 text-xs font-medium text-[#e9edef] hover:bg-[#182229] transition"
+          >
+            <Ban className="h-4 w-4 text-rose-400" />
+            <span>
+              You blocked {title}. <strong className="text-[#25d366]">Tap to unblock</strong>
+            </span>
+          </button>
+        </div>
+      ) : (
+        <MessageComposer
+          onSendTextMessage={sendTextMessage}
+          onSendFileMessage={sendFileMessage}
+          maxFileSizeMb={maxFileSizeMb}
+          disabled={maintenanceMode}
+        />
+      )}
 
       {/* Modals */}
       <MediaViewerModal
         mediaUrl={viewingMediaUrl}
         fileName={viewingMediaName}
-        onClose={() => setViewingMediaUrl(null)}
+        mediaType={viewingMediaType}
+        onClose={() => {
+          setViewingMediaUrl(null);
+          setViewingMediaType(undefined);
+        }}
       />
 
       <ForwardModal
@@ -957,6 +1044,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         contactPhoto={avatarSrc}
         callType={callType}
         callSessionId={activeCallSessionId}
+      />
+
+      <GoogleMeetModal
+        isOpen={isMeetOpen}
+        onClose={() => setIsMeetOpen(false)}
+        title={title}
+        photoURL={avatarSrc}
+        isGroup={!isDirect}
+        targetUid={isDirect && partnerId && partnerId !== user?.uid ? partnerId : undefined}
+        targetName={isDirect ? title : undefined}
+        onSpaceCreated={async (invite) => {
+          if (activeConversation?.id) {
+            await sendMeetMessage(invite, activeConversation.id);
+          }
+        }}
       />
 
       {/* Edit Message Modal */}

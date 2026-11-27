@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface AvatarProps {
   src?: string | null;
   name: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   isOnline?: boolean;
   showPresence?: boolean;
   className?: string;
@@ -22,6 +22,7 @@ const sizeClasses = {
   lg: 'w-12 h-12 text-base',
   xl: 'w-16 h-16 text-xl',
   '2xl': 'w-24 h-24 text-3xl',
+  '3xl': 'w-44 h-44 text-5xl',
 };
 
 const presenceSizes = {
@@ -31,6 +32,7 @@ const presenceSizes = {
   lg: 'w-3.5 h-3.5 right-0.5 bottom-0.5 border-2',
   xl: 'w-4 h-4 right-1 bottom-1 border-2',
   '2xl': 'w-5 h-5 right-2 bottom-2 border-2',
+  '3xl': 'w-6 h-6 right-3 bottom-3 border-2',
 };
 
 // Profile avatar background color palette
@@ -54,6 +56,12 @@ export const Avatar: React.FC<AvatarProps> = ({
   className = '',
   onClick,
 }) => {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
   const getInitials = (str: string) => {
     if (!str) return '?';
     const parts = str.trim().split(/\s+/);
@@ -72,6 +80,8 @@ export const Avatar: React.FC<AvatarProps> = ({
     return bgColors[idx];
   };
 
+  const showImage = Boolean(src && src.trim() && !imgError);
+
   return (
     <div
       onClick={onClick}
@@ -79,15 +89,13 @@ export const Avatar: React.FC<AvatarProps> = ({
         onClick ? 'cursor-pointer' : ''
       } ${className}`}
     >
-      {src ? (
+      {showImage ? (
         <img
-          src={src}
+          src={src!}
           alt={name}
+          referrerPolicy="no-referrer"
           className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-1 ring-white/10`}
-          onError={(e) => {
-            // fallback if broken image
-            e.currentTarget.style.display = 'none';
-          }}
+          onError={() => setImgError(true)}
         />
       ) : (
         <div

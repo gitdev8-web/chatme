@@ -17,6 +17,8 @@ import {
   ArrowLeft,
   Sparkles,
   Info,
+  Video,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -38,7 +40,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onBackMobile,
   onOpenProfile,
 }) => {
-  const { user, profile, updateProfileData, logout, deleteAccount, resetPassword } = useAuth();
+  const {
+    user,
+    profile,
+    meetConnected,
+    connectGoogleMeet,
+    updateProfileData,
+    logout,
+    deleteAccount,
+    resetPassword,
+  } = useAuth();
   const { permission, requestPermission } = useNotifications();
   const { showToast } = useToast();
 
@@ -47,6 +58,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showWallpaperModal, setShowWallpaperModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [connectingMeet, setConnectingMeet] = useState(false);
 
   const [soundsEnabled, setSoundsEnabled] = useState<boolean>(
     () => typeof window === 'undefined' || localStorage.getItem('devchat_sounds') !== 'false'
@@ -463,6 +475,50 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <h3 className="text-sm font-bold text-[#e9edef] border-b border-[#222d34] pb-2">
                   Session & Account Security
                 </h3>
+
+                <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#00a884]/15 text-[#25d366]">
+                      <Video className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[#e9edef]">Google Meet Video Sessions</h4>
+                      <p className="text-[11px] text-[#8696a0] mt-0.5">
+                        {meetConnected
+                          ? 'Google Meet is authorized for creating video rooms this session'
+                          : 'Connect your Google account when starting or managing Google Meet rooms'}
+                      </p>
+                    </div>
+                  </div>
+                  {meetConnected ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#00a884]/20 px-3 py-1.5 text-xs font-bold text-[#25d366] whitespace-nowrap self-start sm:self-center">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>Connected</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={connectingMeet}
+                      onClick={async () => {
+                        setConnectingMeet(true);
+                        try {
+                          await connectGoogleMeet();
+                          showToast('Google Meet connected for this session', 'success');
+                        } catch (err) {
+                          const msg =
+                            err instanceof Error ? err.message : 'Could not connect Google Meet';
+                          showToast(msg, 'error');
+                        } finally {
+                          setConnectingMeet(false);
+                        }
+                      }}
+                      className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-bold text-[#0b141a] hover:bg-[#06cf9c] transition whitespace-nowrap disabled:opacity-60 self-start sm:self-center"
+                    >
+                      {connectingMeet ? 'Connecting...' : 'Connect Google Meet'}
+                    </button>
+                  )}
+                </div>
+
                 <div className="p-4 rounded-xl bg-[#202c33]/50 border border-[#222d34] flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-[#e9edef]">Sign Out</h4>

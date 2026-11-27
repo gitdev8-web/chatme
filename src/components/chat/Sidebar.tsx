@@ -74,6 +74,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isNewChatDrawerOpen, setIsNewChatDrawerOpen] = useState(false);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Ctrl/Cmd + K shortcut to focus chat search
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, []);
 
   // Close 3-dots menu on outside click
   useEffect(() => {
@@ -341,10 +354,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0]" />
           <input
+            ref={searchInputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search or start new chat"
+            placeholder="Search or start new chat (Ctrl+K)"
             className="w-full rounded-xl border border-transparent bg-[#202c33] pl-10 pr-9 py-2 text-[15px] md:text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884] transition"
           />
           {searchTerm && (

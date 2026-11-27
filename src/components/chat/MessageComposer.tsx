@@ -30,6 +30,7 @@ import { ContactShareModal } from './ContactShareModal';
 import { compressImage } from '../../utils/imageUtils';
 import { Emoji3DPicker } from '../emoji/Emoji3DPicker';
 import { MessageType } from '../../types';
+import { getConversationDraft, setConversationDraft } from '../../utils/draftUtils';
 
 interface MessageComposerProps {
   onSendTextMessage: (text: string) => Promise<void>;
@@ -50,9 +51,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   maxFileSizeMb = 25,
   disabled = false,
 }) => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { showToast } = useToast();
   const {
+    activeConversationId,
     replyingTo,
     setReplyingTo,
     emitTyping,
@@ -65,8 +67,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
-  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [pendingMediaFile, setPendingMediaFile] = useState<File | null>(null);
+  const [pendingMediaPreview, setPendingMediaPreview] = useState<string | null>(null);
   const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
 
   const [isPollModalOpen, setIsPollModalOpen] = useState(false);
@@ -80,6 +82,34 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
 
   const voiceRecorder = useVoiceRecorder();
+
+  // Restore saved draft when switching conversations
+  useEffect(() => {
+    const saved = getConversationDraft(user?.uid, activeConversationId);
+    setText(saved);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      if (saved) {
+        requestAnimationFrame(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = `${Math.min(
+              textareaRef.current.scrollHeight,
+              120
+            )}px`;
+          }
+        });
+      }
+    }
+  }, [activeConversationId, user?.uid]);
+
+  // Revoke object URL preview on cleanup if applicable
+  useEffect(() => {
+    return () => {
+      if (pendingMediaPreview && pendingMediaPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(pendingMediaPreview);
+      }
+    };
+  }, [pendingMediaPreview]);
 
   // Keep partner updated with live "recording audio..." presence while recording
   useEffect(() => {
@@ -115,8 +145,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
-    emitTyping(e.target.value.length > 0, 'typing');
+    const nextVal = e.target.value;
+    setText(nextVal);
+    setConversationDraft(user?.uid, activeConversationId, nextVal);
+    emitTyping(nextVal.length > 0, 'typing');
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -136,6 +168,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     if (disabled || !text.trim()) return;
     const content = text;
     setText('');
+    setConversationDraft(user?.uid, activeConversationId, '');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -144,56 +177,85 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const handleEmojiClick = (emoji: string) => {
-    setText((prev) => prev + emoji);
+    setText((prev) => {
+      const updated = prev + emoji;
+      setConversationDraft(user?.uid, activeConversationId, updated);
+      return updated;
+    });
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
   };
 
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      e.target.value = '';
-      setShowAttachMenu(false);
-      if (!validateFileSize(file)) return;
-      try {
-        const compressed = await compressImage(file, 1280, 0.85);
-        setPendingImageFile(compressed.file);
-        setPendingImagePreview(compressed.dataUrl);
+  const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setShowAttachMenu(false);
+    if (!validateFileSize(file)) return;
+
+    if (file.type.startsWith('video/')) {
+      const blobUrl = URL.createObjectURL(file);
+      setPendingMediaFile(file);
+      setPendingMediaPreview(blobUrl);
+      setIsMediaPreviewOpen(true);
+      return;
+    }
+
+    try {
+      const compressed = await compressImage(file, 1280, 0.85);
+      setPendingMediaFile(compressed.file);
+      setPendingMediaPreview(compressed.dataUrl);
+      setIsMediaPreviewOpen(true);
+    } catch {
+      setPendingMediaFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPendingMediaPreview(reader.result as string);
         setIsMediaPreviewOpen(true);
-      } catch {
-        setPendingImageFile(file);
-        const reader = new FileReader();
-        reader.onload = () => {
-          setPendingImagePreview(reader.result as string);
-          setIsMediaPreviewOpen(true);
-        };
-        reader.readAsDataURL(file);
-      }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      e.target.value = '';
-      setShowAttachMenu(false);
-      if (!validateFileSize(file)) return;
-      onSendFileMessage(file, 'file', file.name);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setShowAttachMenu(false);
+    if (!validateFileSize(file)) return;
+    try {
+      await onSendFileMessage(file, 'file', file.name);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to send file', 'error');
     }
   };
 
-  const handleSendImageWithCaption = async (
+  const handleSendMediaWithCaption = async (
     file: File,
     caption: string,
     viewOnce: boolean
   ) => {
-    await onSendFileMessage(file, 'image', file.name, undefined, {
-      viewOnce,
-      caption: caption.trim(),
-    });
-    setPendingImageFile(null);
-    setPendingImagePreview(null);
+    const isVideo = file.type.startsWith('video/');
+    try {
+      await onSendFileMessage(
+        file,
+        isVideo ? 'video' : 'image',
+        file.name,
+        undefined,
+        {
+          viewOnce: isVideo ? false : viewOnce,
+          caption: caption.trim(),
+        }
+      );
+      setPendingMediaFile(null);
+      setPendingMediaPreview(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to send media', 'error');
+      throw err;
+    }
   };
 
   const handleSendVoiceNote = async () => {
@@ -209,6 +271,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       }
     } catch (err) {
       console.error('Failed to send voice note:', err);
+      showToast('Could not send voice note', 'error');
     }
   };
 
@@ -357,7 +420,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             type="file"
             ref={imageInputRef}
             accept="image/*,video/*"
-            onChange={handleImageSelect}
+            onChange={handleMediaSelect}
             className="hidden"
           />
           <input
@@ -365,7 +428,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             ref={cameraInputRef}
             accept="image/*"
             capture="environment"
-            onChange={handleImageSelect}
+            onChange={handleMediaSelect}
             className="hidden"
           />
           <input
@@ -452,14 +515,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       {/* Media Preview Modal with View Once Toggle */}
       <MediaPreviewModal
         isOpen={isMediaPreviewOpen}
-        file={pendingImageFile}
-        previewUrl={pendingImagePreview}
+        file={pendingMediaFile}
+        previewUrl={pendingMediaPreview}
         onClose={() => {
           setIsMediaPreviewOpen(false);
-          setPendingImageFile(null);
-          setPendingImagePreview(null);
+          setPendingMediaFile(null);
+          setPendingMediaPreview(null);
         }}
-        onSend={handleSendImageWithCaption}
+        onSend={handleSendMediaWithCaption}
       />
 
       {/* Poll Creator Modal */}

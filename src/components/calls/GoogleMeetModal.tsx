@@ -111,6 +111,10 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
     }
   };
 
+  const initialMeetingUri = initialMeetSpace?.meetingUri;
+  const initialMeetingCode = initialMeetSpace?.meetingCode;
+  const initialSpaceName = initialMeetSpace?.spaceName;
+
   // Initialize or create Meet room when modal opens
   useEffect(() => {
     if (!isOpen) {
@@ -129,11 +133,11 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
     setCallId(initialCallSessionId);
     setCallStatus(isIncoming ? 'accepted' : targetUid ? 'ringing' : 'active');
 
-    if (initialMeetSpace) {
+    if (initialMeetingUri) {
       setSpace({
-        name: initialMeetSpace.spaceName,
-        meetingUri: initialMeetSpace.meetingUri,
-        meetingCode: initialMeetSpace.meetingCode,
+        name: initialSpaceName || '',
+        meetingUri: initialMeetingUri,
+        meetingCode: initialMeetingCode || '',
       });
       setStep('ready');
       return;
@@ -149,7 +153,15 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
       createdOnceRef.current = true;
       void provisionMeetRoom(token);
     }
-  }, [isOpen, initialMeetSpace, initialCallSessionId]);
+  }, [
+    isOpen,
+    initialMeetingUri,
+    initialMeetingCode,
+    initialSpaceName,
+    initialCallSessionId,
+    isIncoming,
+    targetUid,
+  ]);
 
   const provisionMeetRoom = async (accessToken: string) => {
     setStep('creating');
@@ -295,7 +307,7 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
       try {
         token = await connectGoogleMeet();
       } catch {
-        showToast('Sign in with Google to inspect room status', 'info');
+        showToast('Connect Google Meet to inspect room status', 'info');
         return;
       }
     }
@@ -355,6 +367,19 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
     }
   };
 
+  const handleDismissModal = () => {
+    if (isClosingRef.current) return;
+    // If caller cancels before recipient picks up, end the ringing invite
+    if (callId && !isIncoming && callStatus === 'ringing') {
+      void handleHangupAndClose();
+      return;
+    }
+    isClosingRef.current = true;
+    clearTimers();
+    sound.stopRingtone();
+    onClose();
+  };
+
   const handleHangupAndClose = async () => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
@@ -403,7 +428,7 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
 
             <button
               type="button"
-              onClick={handleHangupAndClose}
+              onClick={handleDismissModal}
               aria-label="Close Google Meet modal"
               className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8696a0] hover:bg-[#202c33] hover:text-[#e9edef] transition"
             >
@@ -424,7 +449,7 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
                     Connect Google Meet
                   </h4>
                   <p className="text-xs text-[#8696a0] leading-relaxed">
-                    Sign in with Google to let DEV CHAT create and manage Google Meet video call rooms on your behalf with your permission.
+                    Authorize Google Meet once for this session so DEV CHAT can create and manage video call rooms on your behalf.
                   </p>
                 </div>
 
@@ -438,7 +463,7 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
                 <GoogleSignInButton
                   onClick={handleAuthorize}
                   loading={authLoading}
-                  label="Sign in with Google"
+                  label="Continue with Google"
                 />
 
                 <p className="text-[11px] text-[#8696a0] flex items-center justify-center gap-1">
@@ -661,13 +686,28 @@ export const GoogleMeetModal: React.FC<GoogleMeetModalProps> = ({
                     <span>Powered by Google Meet</span>
                   </span>
 
-                  <button
-                    type="button"
-                    onClick={handleHangupAndClose}
-                    className="rounded-xl bg-[#ea4335]/15 border border-[#ea4335]/35 px-3.5 py-2 text-xs font-semibold text-rose-300 hover:bg-[#ea4335] hover:text-white transition"
-                  >
-                    {callId ? 'End Call' : 'Done'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {callId && callStatus === 'accepted' && (
+                      <button
+                        type="button"
+                        onClick={handleDismissModal}
+                        className="rounded-xl border border-[#222d34] bg-[#202c33] px-3.5 py-2 text-xs font-semibold text-[#e9edef] hover:bg-[#2a3942] transition"
+                      >
+                        Done
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleHangupAndClose}
+                      className="rounded-xl bg-[#ea4335]/15 border border-[#ea4335]/35 px-3.5 py-2 text-xs font-semibold text-rose-300 hover:bg-[#ea4335] hover:text-white transition"
+                    >
+                      {callId
+                        ? callStatus === 'ringing'
+                          ? 'Cancel Call'
+                          : 'End Call'
+                        : 'Done'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

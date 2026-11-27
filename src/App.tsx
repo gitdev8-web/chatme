@@ -284,7 +284,6 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
                 messages={messages}
                 userCache={userCache}
                 onClose={() => setShowChatDetails(false)}
-                onOpenAddMembers={() => setIsContactsOpen(true)}
               />
             </div>
 
@@ -295,7 +294,6 @@ const MainChatDashboard: React.FC<MainChatDashboardProps> = ({ systemSettings })
                   messages={messages}
                   userCache={userCache}
                   onClose={() => setShowChatDetails(false)}
-                  onOpenAddMembers={() => setIsContactsOpen(true)}
                 />
               </div>
             </div>

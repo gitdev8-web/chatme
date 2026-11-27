@@ -19,6 +19,7 @@ import {
   BarChart3,
   MapPin,
   UserCheck,
+  Video,
 } from 'lucide-react';
 import { Conversation, UserProfile, UserStatusStory } from '../../types';
 import { Avatar } from '../common/Avatar';
@@ -33,6 +34,7 @@ import { ConfirmModal } from '../common/ConfirmModal';
 import { useToast } from '../common/Toast';
 import { StatusRing } from '../status/StatusRing';
 import { isStoryViewedBy } from '../../services/statusService';
+import { getConversationDraft, subscribeDraftChanges } from '../../utils/draftUtils';
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -58,7 +60,17 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [draftText, setDraftText] = useState(() =>
+    getConversationDraft(currentUserId, conversation.id)
+  );
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setDraftText(getConversationDraft(currentUserId, conversation.id));
+    return subscribeDraftChanges(() => {
+      setDraftText(getConversationDraft(currentUserId, conversation.id));
+    });
+  }, [currentUserId, conversation.id]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -139,6 +151,15 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   const renderMessagePreview = () => {
+    if (!isActive && draftText.trim()) {
+      return (
+        <div className="flex items-center gap-1 min-w-0 text-xs">
+          <span className="font-semibold text-[#25d366] flex-shrink-0">Draft:</span>
+          <span className="truncate text-[#8696a0]">{draftText.trim()}</span>
+        </div>
+      );
+    }
+
     const lastMsg = conversation.lastMessage;
     if (!lastMsg) return <span className="text-xs text-[#8696a0]">No messages yet</span>;
 
@@ -171,6 +192,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         {lastMsg.type === 'image' && (
           <Camera className="h-3.5 w-3.5 text-[#8696a0] flex-shrink-0" />
         )}
+        {lastMsg.type === 'video' && (
+          <Video className="h-3.5 w-3.5 text-[#bf59cf] flex-shrink-0" />
+        )}
         {lastMsg.type === 'voice' && (
           <Mic className="h-3.5 w-3.5 text-[#00a884] flex-shrink-0" />
         )}
@@ -186,10 +210,15 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         {lastMsg.type === 'contact' && (
           <UserCheck className="h-3.5 w-3.5 text-[#53bdeb] flex-shrink-0" />
         )}
+        {lastMsg.type === 'meet' && (
+          <Video className="h-3.5 w-3.5 text-[#25d366] flex-shrink-0" />
+        )}
         <span className="truncate">
           {lastMsg.text ||
             (lastMsg.type === 'image'
               ? 'Photo'
+              : lastMsg.type === 'video'
+              ? 'Video'
               : lastMsg.type === 'voice'
               ? 'Voice message'
               : lastMsg.type === 'poll'
@@ -198,6 +227,8 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
               ? 'Location'
               : lastMsg.type === 'contact'
               ? 'Contact'
+              : lastMsg.type === 'meet'
+              ? 'Google Meet video call'
               : 'File')}
         </span>
       </div>
