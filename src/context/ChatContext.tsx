@@ -107,11 +107,14 @@ interface ChatContextType {
   deleteMessage: (messageId: string, forEveryone: boolean) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
   clearConversation: (conversationId: string) => Promise<void>;
-  starMessage: (messageId: string, shouldStar: boolean) => Promise<void>;
+  starMessage: (messageId: string, shouldStar: boolean, conversationIdOverride?: string) => Promise<void>;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   emitTyping: (isTyping: boolean, activity?: 'typing' | 'recording') => void;
   markActiveConversationRead: () => void;
   getUserProfile: (uid: string) => Promise<UserProfile | null>;
+  highlightedMessageId: string | null;
+  clearHighlightedMessage: () => void;
+  jumpToMessage: (conversationId: string, messageId: string) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -131,6 +134,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeFilter, setActiveFilter] = useState<'all' | 'direct' | 'groups' | 'unread' | 'archived'>('all');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [statusStories, setStatusStories] = useState<UserStatusStory[]>([]);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageSoundRef = useRef<string | null>(null);
@@ -1036,11 +1040,25 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Star or unstar a message persistently
-  const starMessage = async (messageId: string, shouldStar: boolean) => {
-    if (!user || !activeConversationId) return;
+  const starMessage = async (
+    messageId: string,
+    shouldStar: boolean,
+    conversationIdOverride?: string
+  ) => {
+    const targetConvId = conversationIdOverride || activeConversationId;
+    if (!user || !targetConvId) return;
     sound.playPop();
-    await toggleStarMessage(activeConversationId, messageId, user.uid, shouldStar);
+    await toggleStarMessage(targetConvId, messageId, user.uid, shouldStar);
   };
+
+  const clearHighlightedMessage = useCallback(() => {
+    setHighlightedMessageId(null);
+  }, []);
+
+  const jumpToMessage = useCallback((conversationId: string, messageId: string) => {
+    setActiveConversationId(conversationId);
+    setHighlightedMessageId(messageId);
+  }, []);
 
   // React to message
   const reactToMessage = async (messageId: string, emoji: string) => {
@@ -1122,6 +1140,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         emitTyping,
         markActiveConversationRead,
         getUserProfile,
+        highlightedMessageId,
+        clearHighlightedMessage,
+        jumpToMessage,
       }}
     >
       {children}

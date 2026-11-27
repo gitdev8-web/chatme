@@ -246,7 +246,9 @@ export function subscribeToUserCallHistory(
   const emitMerged = () => {
     const map = new Map<string, CallSession>();
     [...outgoingCalls, ...incomingCalls].forEach((c) => {
-      if (c && c.id) map.set(c.id, c);
+      if (c && c.id && !c.hiddenBy?.includes(currentUid)) {
+        map.set(c.id, c);
+      }
     });
     const merged = Array.from(map.values()).sort(
       (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -282,6 +284,28 @@ export function subscribeToUserCallHistory(
     unsubOut();
     unsubIn();
   };
+}
+
+export async function hideCallFromHistory(callId: string, uid: string): Promise<void> {
+  if (!callId || !uid) return;
+  try {
+    await updateDoc(doc(db, 'calls', callId), {
+      hiddenBy: arrayUnion(uid),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}`);
+  }
+}
+
+export async function clearUserCallHistory(callIds: string[], uid: string): Promise<void> {
+  if (!uid || !callIds.length) return;
+  await Promise.allSettled(
+    callIds.map((id) =>
+      updateDoc(doc(db, 'calls', id), {
+        hiddenBy: arrayUnion(uid),
+      })
+    )
+  );
 }
 
 export function getCallDurationSeconds(call: CallSession): number | null {

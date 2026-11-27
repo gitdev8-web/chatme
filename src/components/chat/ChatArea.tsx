@@ -20,6 +20,8 @@ import {
   Palette,
   Ban,
   Send,
+  Bookmark,
+  UploadCloud,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -40,7 +42,11 @@ import { StatusViewerModal } from '../status/StatusViewerModal';
 import { StatusRing } from '../status/StatusRing';
 import { isStoryViewedBy } from '../../services/statusService';
 import { initiateCall } from '../../services/callService';
-import { submitReport, toggleMuteConversation } from '../../services/chatService';
+import {
+  isSelfConversation,
+  submitReport,
+  toggleMuteConversation,
+} from '../../services/chatService';
 import { useToast } from '../common/Toast';
 import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
 import {
@@ -93,6 +99,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setReplyingTo,
     setActiveConversationId,
     markActiveConversationRead,
+    highlightedMessageId,
+    clearHighlightedMessage,
   } = useChat();
 
   const [searchInChat, setSearchInChat] = useState(false);
@@ -129,23 +137,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [activeCallSessionId, setActiveCallSessionId] = useState<string | undefined>(undefined);
 
-  // Header 3-dots menu
+  // Header 3-dots menu & drag-drop state
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
+  const dragCounterRef = useRef(0);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const isDirect = activeConversation?.type === 'direct';
+  const isSelfChat = isSelfConversation(activeConversation, user?.uid);
   const partnerId = isDirect
-    ? (activeConversation?.participantIds?.find((id) => id !== user?.uid) ||
-       (activeConversation?.id?.startsWith('dm_')
-         ? activeConversation.id.replace('dm_', '').split('_').find((id) => id !== user?.uid)
-         : null))
+    ? isSelfChat
+      ? user?.uid || null
+      : (activeConversation?.participantIds?.find((id) => id !== user?.uid) ||
+         (activeConversation?.id?.startsWith('dm_')
+           ? activeConversation.id.replace('dm_', '').split('_').find((id) => id !== user?.uid)
+           : null))
     : null;
   const partnerProfile = partnerId ? userCache[partnerId] : null;
 
-  const title = isDirect
+  const title = isSelfChat
+    ? 'Saved Messages (You)'
+    : isDirect
     ? partnerProfile?.displayName || 'DEV CHAT User'
     : activeConversation?.name || 'Group Chat';
 
@@ -153,7 +169,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     ? partnerProfile?.photoURL
     : activeConversation?.photoURL;
 
-  const isPartnerOnline = isDirect ? isUserOnline(partnerProfile) : false;
+  const isPartnerOnline = isDirect && !isSelfChat ? isUserOnline(partnerProfile) : false;
   const isMuted = activeConversation?.mutedBy?.includes(user?.uid || '') || false;
 
   const partnerStories = partnerId
@@ -252,13 +268,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   }, [activeConversation?.id, user, loadingMessages, messages]);
 
   useEffect(() => {
-    if (!showScrollBottom && !chatSearchTerm.trim()) {
+    if (!showScrollBottom && !chatSearchTerm.trim() && !highlightedMessageId) {
       scrollToBottom(true);
     }
     if ((messages || []).some((m) => m.senderId !== user?.uid && !m.readBy?.includes(user?.uid || ''))) {
       markActiveConversationRead();
     }
   }, [(messages || []).length, markActiveConversationRead]);
+
+  // Jump-to-message scroll when navigated from Starred Messages / Global search
+  useEffect(() => {
+    if (!highlightedMessageId || loadingMessages) return;
+    const exists = (messages || []).some((m) => m.id === highlightedMessageId);
+    if (!exists) return;
+    const timer = setTimeout(() => {
+      scrollToAndHighlightMessage(highlightedMessageId);
+      clearHighlightedMessage();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [highlightedMessageId, loadingMessages, messages, clearHighlightedMessage]);
 
   useEffect(() => {
     const unsub = subscribeToWallpaperChange((nextId) => setWallpaperId(nextId));
@@ -524,7 +552,55 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none">
+    <div
+      onDragEnter={(e) => {
+        if (maintenanceMode || isPartnerBlocked) return;
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          dragCounterRef.current += 1;
+          setIsDragOver(true);
+        }
+      }}
+      onDragOver={(e) => {
+        if (maintenanceMode || isPartnerBlocked) return;
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+          if (dragCounterRef.current === 0) {
+            setIsDragOver(false);
+          }
+        }
+      }}
+      onDrop={(e) => {
+        if (maintenanceMode || isPartnerBlocked) return;
+        if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+          e.preventDefault();
+          dragCounterRef.current = 0;
+          setIsDragOver(false);
+          setDroppedFile(e.dataTransfer.files[0]);
+        }
+      }}
+      className="flex h-full flex-1 flex-col bg-[#0b141a] relative overflow-hidden select-none"
+    >
+      {/* Drag-and-Drop Overlay */}
+      {isDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[#0b141a]/85 backdrop-blur-sm p-6 animate-in fade-in">
+          <div className="flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-[#00a884] bg-[#182229] px-10 py-8 text-center shadow-2xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884]/20 text-[#25d366]">
+              <UploadCloud className="h-7 w-7" />
+            </div>
+            <p className="text-sm font-bold text-[#e9edef]">Drop file to share in {title}</p>
+            <p className="text-xs text-[#8696a0]">
+              Images, videos, or documents up to {maxFileSizeMb} MB
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex h-14 md:h-16 items-center justify-between border-b border-[#222d34] bg-[#202c33] px-2.5 sm:px-4 py-2 z-10 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
@@ -537,7 +613,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <ArrowLeft className="h-5 w-5" />
           </button>
 
-          {hasPartnerStatus ? (
+          {isSelfChat ? (
+            <div
+              onClick={onToggleDetails}
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00a884] to-[#128c7e] text-[#0b141a] cursor-pointer shadow-sm"
+            >
+              <Bookmark className="h-5 w-5 fill-current" />
+            </div>
+          ) : hasPartnerStatus ? (
             <StatusRing
               totalSegments={partnerStories.length}
               unviewedCount={unviewedPartnerStatusCount}
@@ -584,7 +667,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               )}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-[#8696a0] truncate">
-              {(typingUsers || []).length > 0 ? (
+              {isSelfChat ? (
+                <span>Message yourself · Notes & snippets</span>
+              ) : (typingUsers || []).length > 0 ? (
                 <span className="text-[#25d366] font-medium">
                   {typingText()}
                 </span>
@@ -605,20 +690,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-1 text-[#aebac1] flex-shrink-0">
-          <button
-            onClick={() => handleStartCall('video')}
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
-              videoCallsEnabled
-                ? 'hover:bg-[#374248] hover:text-[#25d366]'
-                : 'opacity-40 cursor-not-allowed'
-            }`}
-            title={videoCallsEnabled ? 'Start Google Meet video call' : 'Video calls disabled'}
-            aria-label="Google Meet video call"
-          >
-            <Video className="h-5 w-5" />
-          </button>
+          {!isSelfChat && (
+            <button
+              onClick={() => handleStartCall('video')}
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
+                videoCallsEnabled
+                  ? 'hover:bg-[#374248] hover:text-[#25d366]'
+                  : 'opacity-40 cursor-not-allowed'
+              }`}
+              title={videoCallsEnabled ? 'Start Google Meet video call' : 'Video calls disabled'}
+              aria-label="Google Meet video call"
+            >
+              <Video className="h-5 w-5" />
+            </button>
+          )}
 
-          {isDirect && (
+          {isDirect && !isSelfChat && (
             <button
               onClick={() => handleStartCall('audio')}
               className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
@@ -994,6 +1081,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onSendFileMessage={sendFileMessage}
           maxFileSizeMb={maxFileSizeMb}
           disabled={maintenanceMode}
+          droppedFile={droppedFile}
+          onClearDroppedFile={() => setDroppedFile(null)}
         />
       )}
 

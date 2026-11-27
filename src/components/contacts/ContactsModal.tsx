@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Search, MessageSquare, Loader2 } from 'lucide-react';
+import { Search, MessageSquare, Loader2, Bookmark } from 'lucide-react';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../context/AuthContext';
@@ -21,7 +21,7 @@ interface ContactsModalProps {
 }
 
 export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { startDirectChat, statusStories } = useChat();
   const [searchTerm, setSearchTerm] = useState('');
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -125,6 +125,43 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
 
         {/* User list */}
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+          {user?.uid &&
+            (!searchTerm.trim() ||
+              'saved messages you notes'.includes(searchTerm.trim().toLowerCase()) ||
+              (profile?.displayName || '').toLowerCase().includes(searchTerm.trim().toLowerCase())) && (
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-[#00a884]/10 hover:bg-[#00a884]/15 transition border border-[#00a884]/30">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative flex-shrink-0">
+                    <Avatar
+                      src={profile?.photoURL || user.photoURL || undefined}
+                      name={profile?.displayName || 'You'}
+                      size="md"
+                      showPresence={false}
+                    />
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#00a884] text-[#0b141a] ring-2 ring-[#111b21]">
+                      <Bookmark className="h-2.5 w-2.5 fill-current" />
+                    </span>
+                  </div>
+                  <div className="min-w-0 truncate">
+                    <h4 className="text-xs font-semibold text-slate-200 truncate">
+                      Saved Messages (You)
+                    </h4>
+                    <p className="text-[11px] text-emerald-400 truncate">
+                      Personal space for notes, code & files
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleStartChat(user.uid)}
+                  disabled={startingChatUid === user.uid}
+                  className="flex items-center gap-1.5 rounded-xl bg-[#00a884] px-3.5 py-1.5 text-xs font-semibold text-[#0b141a] shadow-md hover:bg-[#06cf9c] disabled:opacity-50 transition"
+                >
+                  <Bookmark className="h-3.5 w-3.5" />
+                  <span>{startingChatUid === user.uid ? 'Opening...' : 'Open'}</span>
+                </button>
+              </div>
+            )}
+
           {loading ? (
             <div className="flex items-center justify-center py-8 text-xs text-slate-500">
               <Loader2 className="h-5 w-5 animate-spin mr-2 text-emerald-500" />

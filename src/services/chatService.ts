@@ -56,26 +56,39 @@ export function getDirectConversationId(uid1: string, uid2: string): string {
   return `dm_${sorted}`;
 }
 
+export function isSelfConversation(
+  conversation: Pick<Conversation, 'id' | 'type' | 'participantIds'> | null | undefined,
+  currentUid?: string | null
+): boolean {
+  if (!conversation || !currentUid || conversation.type !== 'direct') return false;
+  if (conversation.id === `dm_${currentUid}_${currentUid}`) return true;
+  const parts = conversation.participantIds || [];
+  return parts.length > 0 && parts.every((id) => id === currentUid);
+}
+
 export async function getOrCreateDirectConversation(
   currentUid: string,
   targetUid: string
 ): Promise<string> {
   const conversationId = getDirectConversationId(currentUid, targetUid);
   const convRef = doc(db, 'conversations', conversationId);
+  const isSelf = currentUid === targetUid;
 
   const initialConv: Conversation = {
     id: conversationId,
     type: 'direct',
-    participantIds: [currentUid, targetUid],
+    participantIds: isSelf ? [currentUid] : [currentUid, targetUid],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     pinnedBy: [],
     mutedBy: [],
     archivedBy: [],
-    unreadCounts: {
-      [currentUid]: 0,
-      [targetUid]: 0,
-    },
+    unreadCounts: isSelf
+      ? { [currentUid]: 0 }
+      : {
+          [currentUid]: 0,
+          [targetUid]: 0,
+        },
   };
 
   try {
@@ -837,4 +850,39 @@ export async function unpinMessageInConversation(
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `conversations/${conversationId}`);
   }
+}
+
+export async function fetchGlobalStarredMessages(
+  conversations: Conversation[],
+  uid: string
+): Promise<Array<{ conversation: Conversation; message: Message }>> {
+  if (!uid || conversations.length === 0) return [];
+  const results: Array<{ conversation: Conversation; message: Message }> = [];
+
+  await Promise.allSettled(
+    conversations.slice(0, 40).map(async (conv) => {
+      try {
+        const q = query(
+          collection(db, 'conversations', conv.id, 'messages'),
+          where('starredBy', 'array-contains', uid),
+          limit(25)
+        );
+        const snap = await getDocs(q);
+        snap.forEach((docSnap) => {
+          const msg = { ...(docSnap.data() as Message), id: docSnap.id };
+          if (!msg.isDeleted && !msg.deletedFor?.includes(uid)) {
+            results.push({ conversation: conv, message: msg });
+          }
+        });
+      } catch {
+        // Ignore inaccessible or empty subcollections
+      }
+    })
+  );
+
+  return results.sort(
+    (a, b) =>
+      new Date(b.message.createdAt || 0).getTime() -
+      new Date(a.message.createdAt || 0).getTime()
+  );
 }

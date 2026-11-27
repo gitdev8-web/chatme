@@ -17,6 +17,8 @@ import {
   X,
   Clock,
   ExternalLink,
+  MessageSquare,
+  Trash2,
 } from 'lucide-react';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -24,11 +26,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import { CallSession, UserProfile } from '../../types';
 import {
+  clearUserCallHistory,
   getCallDurationSeconds,
+  hideCallFromHistory,
   initiateCall,
   subscribeToUserCallHistory,
 } from '../../services/callService';
 import { Avatar } from '../common/Avatar';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { CallModal } from './CallModal';
 import { GoogleMeetModal } from './GoogleMeetModal';
 import { useToast } from '../common/Toast';
@@ -48,13 +53,15 @@ export const CallsPage: React.FC<CallsPageProps> = ({
   videoCallsEnabled = true,
 }) => {
   const { user, profile } = useAuth();
-  const { userCache, getUserProfile } = useChat();
+  const { userCache, getUserProfile, startDirectChat } = useChat();
   const { showToast } = useToast();
 
   const [callHistory, setCallHistory] = useState<CallSession[]>([]);
   const [directoryUsers, setDirectoryUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'missed' | 'audio' | 'video'>('all');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearingCalls, setClearingCalls] = useState(false);
 
   // Outgoing call modal state
   const [activeCall, setActiveCall] = useState<{
@@ -193,6 +200,16 @@ export const CallsPage: React.FC<CallsPageProps> = ({
     return `${m}:${String(s).padStart(2, '0')}`;
   };
 
+  const handleOpenDirectChat = async (targetUid?: string) => {
+    if (!targetUid || targetUid === user?.uid) return;
+    try {
+      await startDirectChat(targetUid);
+      onBackMobile?.();
+    } catch {
+      showToast('Could not open conversation', 'error');
+    }
+  };
+
   return (
     <div className="flex h-full w-full flex-col bg-[#0b141a] text-[#e9edef] select-none overflow-hidden">
       {/* Top Header */}
@@ -325,6 +342,15 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
                         type="button"
+                        onClick={() => void handleOpenDirectChat(contact.uid)}
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#202c33] text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef] transition"
+                        title="Send message"
+                        aria-label={`Message ${contact.displayName}`}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() =>
                           handlePlaceCall(contact.uid, contact.displayName, contact.photoURL, 'audio')
                         }
@@ -359,6 +385,16 @@ export const CallsPage: React.FC<CallsPageProps> = ({
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#8696a0]">
               Recent Calls ({filteredHistory.length})
             </h3>
+            {callHistory.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(true)}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-400 hover:bg-rose-500/10 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Clear log</span>
+              </button>
+            )}
           </div>
 
           {filteredHistory.length === 0 ? (
@@ -459,6 +495,17 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                           <span className="hidden sm:inline">Join</span>
                         </a>
                       )}
+                      {peerId && peerId !== user?.uid && (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenDirectChat(peerId)}
+                          className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#202c33] text-[#8696a0] hover:bg-[#2a3942] hover:text-[#e9edef] transition"
+                          title={`Message ${peerName}`}
+                          aria-label={`Message ${peerName}`}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -473,6 +520,19 @@ export const CallsPage: React.FC<CallsPageProps> = ({
                         ) : (
                           <Phone className="h-4 w-4" />
                         )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!user?.uid) return;
+                          await hideCallFromHistory(call.id, user.uid);
+                          showToast('Removed from call log', 'info');
+                        }}
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#202c33] text-[#8696a0] hover:bg-rose-500/15 hover:text-rose-400 transition"
+                        title="Remove call entry"
+                        aria-label="Remove call entry"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
@@ -512,6 +572,31 @@ export const CallsPage: React.FC<CallsPageProps> = ({
           targetName={activeMeetCall.targetUid ? activeMeetCall.contactName : undefined}
         />
       )}
+
+      {/* Clear Call Log Confirmation */}
+      <ConfirmModal
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        loading={clearingCalls}
+        onConfirm={async () => {
+          if (!user?.uid) return;
+          setClearingCalls(true);
+          try {
+            await clearUserCallHistory(
+              callHistory.map((c) => c.id),
+              user.uid
+            );
+            showToast('Call history cleared', 'info');
+          } finally {
+            setClearingCalls(false);
+            setShowClearConfirm(false);
+          }
+        }}
+        title="Clear recent call logs?"
+        description="This removes all call log entries from your view."
+        confirmText="Clear logs"
+        variant="danger"
+      />
     </div>
   );
 };

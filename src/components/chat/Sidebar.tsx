@@ -14,6 +14,8 @@ import {
   Archive,
   Phone,
   X,
+  Star,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -21,7 +23,8 @@ import { ConversationItem } from './ConversationItem';
 import { Avatar } from '../common/Avatar';
 import { ConversationSkeleton } from '../common/LoadingSkeleton';
 import { EmptyState } from '../common/EmptyState';
-import { UserStatusStory } from '../../types';
+import { Modal } from '../common/Modal';
+import { Conversation, Message, UserStatusStory } from '../../types';
 import { ProfileDrawer } from '../profile/ProfileDrawer';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
 import { NewChatDrawer } from '../contacts/NewChatDrawer';
@@ -29,6 +32,7 @@ import { StatusViewerModal } from '../status/StatusViewerModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { fetchGlobalStarredMessages, isSelfConversation } from '../../services/chatService';
 
 interface SidebarProps {
   onOpenStatus: () => void;
@@ -60,6 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setActiveFilter,
     statusStories,
     hasUnreadStatuses,
+    jumpToMessage,
+    starMessage,
   } = useChat();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,6 +73,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [activeStoryList, setActiveStoryList] = useState<UserStatusStory[]>([]);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showStarredHub, setShowStarredHub] = useState(false);
+  const [loadingStarred, setLoadingStarred] = useState(false);
+  const [globalStarred, setGlobalStarred] = useState<
+    Array<{ conversation: Conversation; message: Message }>
+  >([]);
 
   // Slide-over Drawers
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
@@ -120,6 +131,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
+        if (isSelfConversation(conv, user?.uid) && 'saved messages you notes'.includes(q)) {
+          return true;
+        }
         if (conv.type === 'group' && (conv.name || '').toLowerCase().includes(q)) return true;
         if ((conv.lastMessage?.text || '').toLowerCase().includes(q)) return true;
 
@@ -303,6 +317,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <span>Archived chats</span>
                   <span className="tabular-nums text-[11px] font-semibold text-[#00a884]">{archivedCount}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenuDropdown(false);
+                    setShowStarredHub(true);
+                    if (user?.uid) {
+                      setLoadingStarred(true);
+                      void fetchGlobalStarredMessages(conversations, user.uid)
+                        .then((items) => setGlobalStarred(items))
+                        .finally(() => setLoadingStarred(false));
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-xs text-[#d1d7db] hover:bg-[#182229] transition"
+                >
+                  <Star className="h-3.5 w-3.5 text-[#ffd279]" />
+                  <span>Starred messages</span>
                 </button>
                 <button
                   onClick={() => {
@@ -494,6 +524,87 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onClose={() => setIsStoryViewerOpen(false)}
         stories={activeStoryList}
       />
+
+      {/* Global Starred Messages Hub */}
+      <Modal
+        isOpen={showStarredHub}
+        onClose={() => setShowStarredHub(false)}
+        title="Starred Messages"
+        subtitle="Saved messages across all your chats"
+        maxWidth="md"
+      >
+        {loadingStarred ? (
+          <div className="flex items-center justify-center py-10 text-xs text-[#8696a0] gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-[#00a884]" />
+            <span>Loading starred messages...</span>
+          </div>
+        ) : globalStarred.length === 0 ? (
+          <div className="py-10 text-center space-y-2">
+            <Star className="h-8 w-8 mx-auto text-[#ffd279]/50" />
+            <p className="text-xs text-[#8696a0]">
+              No starred messages yet. Star any message to bookmark it here for quick access.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+            {globalStarred.map(({ conversation: conv, message: msg }) => {
+              const isSelfConv = isSelfConversation(conv, user?.uid);
+              const partnerId = conv.participantIds?.find((id) => id !== user?.uid);
+              const convLabel = isSelfConv
+                ? 'Saved Messages (You)'
+                : conv.type === 'group'
+                ? conv.name || 'Group Chat'
+                : (partnerId && userCache[partnerId]?.displayName) || 'Direct Chat';
+
+              return (
+                <div
+                  key={`${conv.id}_${msg.id}`}
+                  onClick={() => {
+                    setShowStarredHub(false);
+                    jumpToMessage(conv.id, msg.id);
+                  }}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-[#222d34] bg-[#202c33] p-3 cursor-pointer hover:border-[#00a884]/40 transition"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-[#8696a0] mb-1">
+                      <span className="font-semibold text-[#00a884] truncate">
+                        {msg.senderName}
+                      </span>
+                      <span>in</span>
+                      <span className="font-medium text-[#e9edef] truncate">{convLabel}</span>
+                      <span>•</span>
+                      <span className="tabular-nums flex-shrink-0">
+                        {new Date(msg.createdAt).toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#e9edef] break-words line-clamp-3">
+                      {msg.text || msg.fileName || msg.type}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await starMessage(msg.id, false, conv.id);
+                      setGlobalStarred((prev) =>
+                        prev.filter((item) => item.message.id !== msg.id)
+                      );
+                    }}
+                    className="p-1.5 rounded-lg text-[#ffd279] hover:bg-[#111b21] transition flex-shrink-0"
+                    title="Unstar message"
+                    aria-label="Unstar message"
+                  >
+                    <Star className="h-4 w-4 fill-current" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
 
       {/* Logout Confirmation Modal */}
       <ConfirmModal

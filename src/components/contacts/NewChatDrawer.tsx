@@ -9,8 +9,8 @@ import {
   Search,
   Users,
   Layers,
-  MessageSquare,
   Loader2,
+  Bookmark,
 } from 'lucide-react';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -31,7 +31,7 @@ export const NewChatDrawer: React.FC<NewChatDrawerProps> = ({
   onClose,
   onOpenCreateGroup,
 }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { startDirectChat } = useChat();
   const [searchTerm, setSearchTerm] = useState('');
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -159,6 +159,41 @@ export const NewChatDrawer: React.FC<NewChatDrawerProps> = ({
 
       {/* Contact List */}
       <div className="flex-1 overflow-y-auto divide-y divide-[#222d34]/60">
+        {user?.uid &&
+          (!searchTerm.trim() ||
+            'saved messages you notes'.includes(searchTerm.trim().toLowerCase()) ||
+            (profile?.displayName || '').toLowerCase().includes(searchTerm.trim().toLowerCase())) && (
+            <div
+              onClick={() => handleSelectContact(user.uid)}
+              className="flex items-center gap-3.5 px-5 py-3.5 cursor-pointer bg-[#00a884]/5 hover:bg-[#202c33] transition border-b border-[#222d34]"
+            >
+              <div className="relative flex-shrink-0">
+                <Avatar
+                  src={profile?.photoURL || user.photoURL || undefined}
+                  name={profile?.displayName || 'You'}
+                  size="md"
+                  showPresence={false}
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#00a884] text-[#0b141a] ring-2 ring-[#111b21]">
+                  <Bookmark className="h-2.5 w-2.5 fill-current" />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1 truncate">
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-xs font-semibold text-[#e9edef] truncate">
+                    Saved Messages (You)
+                  </h4>
+                </div>
+                <p className="text-[11px] text-[#00a884] truncate mt-0.5">
+                  Message yourself · Save notes, code & files
+                </p>
+              </div>
+              {openingUid === user.uid && (
+                <Loader2 className="h-4 w-4 animate-spin text-[#00a884]" />
+              )}
+            </div>
+          )}
+
         <div className="px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[#00a884]">
           Contacts on DEV CHAT
         </div>

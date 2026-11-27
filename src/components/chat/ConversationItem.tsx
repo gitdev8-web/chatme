@@ -20,10 +20,12 @@ import {
   MapPin,
   UserCheck,
   Video,
+  Bookmark,
 } from 'lucide-react';
 import { Conversation, UserProfile, UserStatusStory } from '../../types';
 import { Avatar } from '../common/Avatar';
 import {
+  isSelfConversation,
   toggleArchiveConversation,
   toggleMuteConversation,
   togglePinConversation,
@@ -84,12 +86,15 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   }, [showMenu]);
 
   const isDirect = conversation.type === 'direct';
+  const isSelfChat = isSelfConversation(conversation, currentUserId);
   const partnerId = isDirect
-    ? conversation.participantIds?.find((id) => id !== currentUserId) || currentUserId
+    ? isSelfChat
+      ? currentUserId
+      : conversation.participantIds?.find((id) => id !== currentUserId) || currentUserId
     : null;
   const partnerProfile = partnerId ? userCache[partnerId] : null;
 
-  const partnerStories = isDirect && partnerId
+  const partnerStories = isDirect && partnerId && !isSelfChat
     ? userStatusStories.filter((s) => s.userId === partnerId)
     : [];
   const hasActiveStatus = partnerStories.length > 0;
@@ -97,7 +102,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     (s) => !isStoryViewedBy(s, currentUserId)
   ).length;
 
-  const title = isDirect
+  const title = isSelfChat
+    ? 'Saved Messages (You)'
+    : isDirect
     ? partnerProfile?.displayName || 'DEV CHAT User'
     : conversation.name || 'Group';
 
@@ -105,7 +112,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     ? partnerProfile?.photoURL
     : conversation.photoURL;
 
-  const isOnline = isDirect ? isUserOnline(partnerProfile) : false;
+  const isOnline = isDirect && !isSelfChat ? isUserOnline(partnerProfile) : false;
 
   const isPinned = conversation.pinnedBy?.includes(currentUserId) || false;
   const isMuted = conversation.mutedBy?.includes(currentUserId) || false;
@@ -271,7 +278,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           </StatusRing>
         ) : (
           <div className="relative flex-shrink-0">
-            {!isDirect && !avatarSrc ? (
+            {isSelfChat ? (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#00a884] to-[#128c7e] text-[#0b141a] shadow-sm">
+                <Bookmark className="h-5 w-5 fill-current" />
+              </div>
+            ) : !isDirect && !avatarSrc ? (
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6a7f8a]/30 text-[#e9edef]">
                 <Users className="h-5 w-5" />
               </div>

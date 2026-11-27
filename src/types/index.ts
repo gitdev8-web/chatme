@@ -217,4 +217,5 @@ export interface CallSession {
   answer?: { type: string; sdp: string; by?: 'caller' | 'receiver' };
   callerIce?: string[];
   receiverIce?: string[];
+  hiddenBy?: string[];
 }

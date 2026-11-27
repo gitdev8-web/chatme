@@ -29,6 +29,7 @@ import {
   Search,
   Check,
   Loader2,
+  Bookmark,
 } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -40,6 +41,7 @@ import { useToast } from '../common/Toast';
 import { isUserOnline, formatLastSeen } from '../../utils/presenceUtils';
 import {
   addGroupMembers,
+  isSelfConversation,
   removeGroupMember,
   sendGroupSystemNotice,
   toggleGroupAdmin,
@@ -78,7 +80,13 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
   onClose,
 }) => {
   const { user, profile, updateProfileData } = useAuth();
-  const { deleteConversation, clearConversation, starMessage, setActiveConversationId } = useChat();
+  const {
+    deleteConversation,
+    clearConversation,
+    starMessage,
+    setActiveConversationId,
+    jumpToMessage,
+  } = useChat();
   const { showToast } = useToast();
 
   const [activeMediaTab, setActiveMediaTab] = useState<'media' | 'docs' | 'links'>('media');
@@ -122,11 +130,14 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
   const [addingMembers, setAddingMembers] = useState(false);
 
   const isDirect = conversation.type === 'direct';
+  const isSelfChat = isSelfConversation(conversation, user?.uid);
   const partnerId = isDirect
-    ? conversation.participantIds?.find((id) => id !== user?.uid) || user?.uid
+    ? isSelfChat
+      ? user?.uid || null
+      : conversation.participantIds?.find((id) => id !== user?.uid) || user?.uid
     : null;
   const partnerProfile = partnerId ? userCache[partnerId] : null;
-  const isBlocked = !!(partnerId && profile?.blockedUserIds?.includes(partnerId));
+  const isBlocked = !!(partnerId && !isSelfChat && profile?.blockedUserIds?.includes(partnerId));
 
   const isGroupAdmin =
     conversation.type === 'group' &&
@@ -170,7 +181,9 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
     (m) => m.starredBy?.includes(user?.uid || '') && !m.isDeleted
   );
 
-  const title = isDirect
+  const title = isSelfChat
+    ? 'Saved Messages (You)'
+    : isDirect
     ? partnerProfile?.displayName || 'DEV CHAT User'
     : conversation.name || 'Group Chat';
 
@@ -178,7 +191,7 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
     ? partnerProfile?.photoURL
     : conversation.photoURL;
 
-  const isOnline = isDirect ? isUserOnline(partnerProfile) : false;
+  const isOnline = isDirect && !isSelfChat ? isUserOnline(partnerProfile) : false;
 
   const disappearingLabel =
     DISAPPEARING_OPTIONS.find((opt) => opt.seconds === (conversation.disappearingDuration || 0))
@@ -259,6 +272,36 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
     await updateDisappearingMessages(conversation.id, seconds);
     setShowDisappearingModal(false);
     showToast(`Disappearing messages set to: ${label}`, 'info');
+  };
+
+  const handleExportChat = () => {
+    const validMsgs = (messages || []).filter((m) => !m.isDeleted);
+    if (validMsgs.length === 0) {
+      showToast('No messages available to export', 'info');
+      return;
+    }
+    const header = `DEV CHAT Transcript - ${title}\nExported: ${new Date().toLocaleString()}\nMessages: ${validMsgs.length}\n${'='.repeat(48)}\n\n`;
+    const body = validMsgs
+      .map((m) => {
+        const time = new Date(m.createdAt).toLocaleString();
+        const content =
+          m.text ||
+          (m.fileName ? `[${m.type.toUpperCase()}: ${m.fileName}]` : `[${m.type.toUpperCase()}]`);
+        return `[${time}] ${m.senderName}: ${content}`;
+      })
+      .join('\n');
+
+    const blob = new Blob([header + body], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeName = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    link.href = url;
+    link.download = `devchat-${safeName || 'transcript'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('Chat transcript exported (.txt)', 'success');
   };
 
   const openEditGroupModal = () => {
@@ -426,23 +469,29 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
       <div className="flex-1 overflow-y-auto space-y-3 pb-8">
         {/* Profile Card */}
         <div className="flex flex-col items-center bg-[#111b21] p-6 text-center border-b border-[#222d34]">
-          <Avatar
-            src={avatarSrc}
-            name={title}
-            size="2xl"
-            isOnline={isOnline}
-            showPresence={isDirect}
-            onClick={
-              avatarSrc
-                ? () => {
-                    setViewingMediaUrl(avatarSrc);
-                    setViewingMediaName(title);
-                    setViewingMediaType('image');
-                  }
-                : undefined
-            }
-            className="mb-4 shadow-xl ring-2 ring-[#202c33]"
-          />
+          {isSelfChat ? (
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#00a884] to-[#128c7e] text-[#0b141a] shadow-xl ring-2 ring-[#202c33]">
+              <Bookmark className="h-9 w-9 fill-current" />
+            </div>
+          ) : (
+            <Avatar
+              src={avatarSrc}
+              name={title}
+              size="2xl"
+              isOnline={isOnline}
+              showPresence={isDirect}
+              onClick={
+                avatarSrc
+                  ? () => {
+                      setViewingMediaUrl(avatarSrc);
+                      setViewingMediaName(title);
+                      setViewingMediaType('image');
+                    }
+                  : undefined
+              }
+              className="mb-4 shadow-xl ring-2 ring-[#202c33]"
+            />
+          )}
           <div className="flex items-center justify-center gap-2 max-w-full">
             <h2 className="text-lg font-semibold text-[#e9edef] truncate">
               {title}
@@ -460,11 +509,13 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             )}
           </div>
           <p className="text-xs text-[#8696a0] mt-1 font-mono">
-            {isDirect
+            {isSelfChat
+              ? 'Private workspace · Notes & code'
+              : isDirect
               ? partnerProfile?.phoneNumber || `@${partnerProfile?.username || 'user'}`
               : `${conversation.participantIds?.length || 0} members`}
           </p>
-          {isDirect && (
+          {isDirect && !isSelfChat && (
             <p className="text-[11px] text-[#00a884] mt-1">
               {isOnline ? 'Online now' : formatLastSeen(partnerProfile)}
             </p>
@@ -698,6 +749,21 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
               Messages and calls are end-to-end encrypted. Tap to verify.
             </p>
           </button>
+
+          <button
+            type="button"
+            onClick={handleExportChat}
+            className="flex w-full items-center justify-between px-6 py-3.5 text-left hover:bg-[#202c33] transition"
+          >
+            <div className="flex items-center gap-4 text-[#e9edef]">
+              <Download className="h-5 w-5 text-[#53bdeb]" />
+              <div>
+                <span className="text-xs block">Export chat</span>
+                <span className="text-[10px] text-[#8696a0]">Download transcript (.txt)</span>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-[#8696a0]" />
+          </button>
         </div>
 
         {/* Group Participants */}
@@ -810,7 +876,7 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             <span>Delete Chat</span>
           </button>
 
-          {isDirect && (
+          {isDirect && !isSelfChat && (
             <button
               type="button"
               onClick={handleBlockUser}
@@ -821,14 +887,16 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => setReporting(true)}
-            className="flex w-full items-center gap-4 px-6 py-3.5 text-xs text-rose-400 hover:bg-[#202c33] transition"
-          >
-            <Flag className="h-4 w-4" />
-            <span>Report {title}</span>
-          </button>
+          {!isSelfChat && (
+            <button
+              type="button"
+              onClick={() => setReporting(true)}
+              className="flex w-full items-center gap-4 px-6 py-3.5 text-xs text-rose-400 hover:bg-[#202c33] transition"
+            >
+              <Flag className="h-4 w-4" />
+              <span>Report {title}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1028,7 +1096,11 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
             {starredMessages.map((m) => (
               <div
                 key={m.id}
-                className="flex items-start justify-between gap-3 rounded-xl border border-[#222d34] bg-[#202c33] p-3"
+                onClick={() => {
+                  setShowStarredModal(false);
+                  jumpToMessage(conversation.id, m.id);
+                }}
+                className="flex items-start justify-between gap-3 rounded-xl border border-[#222d34] bg-[#202c33] p-3 cursor-pointer hover:border-[#00a884]/40 transition"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-[11px] text-[#8696a0] mb-1">
@@ -1049,7 +1121,10 @@ export const ChatDetailsSidebar: React.FC<ChatDetailsSidebarProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => starMessage(m.id, false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    starMessage(m.id, false);
+                  }}
                   className="p-1.5 rounded-lg text-[#ffd279] hover:bg-[#111b21] transition"
                   title="Unstar message"
                 >
